@@ -462,7 +462,7 @@
 				qcom,supply-min-voltage = <1200000>;
 				qcom,supply-max-voltage = <1200000>;
 				qcom,supply-enable-load = <21800>;
-				qcom,supply-disable-load = <4>;
+				qcom,supply-disable-load = <0>;
 			};
 		};
 	};
@@ -496,7 +496,7 @@
 				qcom,supply-min-voltage = <1200000>;
 				qcom,supply-max-voltage = <1200000>;
 				qcom,supply-enable-load = <21800>;
-				qcom,supply-disable-load = <4>;
+				qcom,supply-disable-load = <0>;
 			};
 		};
 	};
@@ -530,7 +530,7 @@
 				qcom,supply-min-voltage = <880000>;
 				qcom,supply-max-voltage = <880000>;
 				qcom,supply-enable-load = <36000>;
-				qcom,supply-disable-load = <32>;
+				qcom,supply-disable-load = <0>;
 			};
 		};
 	};
@@ -564,7 +564,7 @@
 				qcom,supply-min-voltage = <880000>;
 				qcom,supply-max-voltage = <880000>;
 				qcom,supply-enable-load = <36000>;
-				qcom,supply-disable-load = <32>;
+				qcom,supply-disable-load = <0>;
 			};
 		};
 	};
@@ -637,7 +637,7 @@
 				qcom,supply-min-voltage = <1200000>;
 				qcom,supply-max-voltage = <1200000>;
 				qcom,supply-enable-load = <21800>;
-				qcom,supply-disable-load = <4>;
+				qcom,supply-disable-load = <0>;
 			};
 		};
 
@@ -651,7 +651,7 @@
 				qcom,supply-min-voltage = <880000>;
 				qcom,supply-max-voltage = <880000>;
 				qcom,supply-enable-load = <36000>;
-				qcom,supply-disable-load = <32>;
+				qcom,supply-disable-load = <0>;
 			};
 		};
 	};
