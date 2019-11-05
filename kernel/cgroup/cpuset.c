@@ -59,6 +59,8 @@
 #include <linux/oom.h>
 #include <linux/sched/isolation.h>
 #include <linux/uaccess.h>
+#include <linux/binfmts.h>
+
 #include <linux/atomic.h>
 #include <linux/mutex.h>
 #include <linux/cgroup.h>
