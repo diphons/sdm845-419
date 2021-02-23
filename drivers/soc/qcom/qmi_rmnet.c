@@ -46,7 +46,6 @@ unsigned int rmnet_wq_frequency __read_mostly = 1000;
 					1 : rmnet_wq_frequency/10) * (HZ/100))
 #define NO_DELAY (0x0000 * HZ)
 #define PS_INTERVAL_MS (1000)
-#define PS_INTERVAL_KT (ms_to_ktime(PS_INTERVAL_MS))
 #define WATCHDOG_EXPIRE_JF (msecs_to_jiffies(50))
 
 #ifdef CONFIG_QCOM_QMI_DFC
