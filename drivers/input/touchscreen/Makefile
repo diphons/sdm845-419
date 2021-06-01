@@ -115,4 +115,5 @@ obj-$(CONFIG_TOUCHSCREEN_SYNAPTICS_TCM)	+= synaptics_tcm/
 obj-$(CONFIG_TOUCHSCREEN_FTS)	+= focaltech_touch/
 obj-$(CONFIG_TOUCHSCREEN_NT36XXX)	+= nt36xxx/
 obj-$(CONFIG_TOUCHSCREEN_FOCALTECH) += focaltech_spi/
+obj-$(CONFIG_TOUCHSCREEN_ST_FTS_V521) += fts_521/
 obj-$(CONFIG_TOUCHSCREEN_COMMON)	+= tp_common.o

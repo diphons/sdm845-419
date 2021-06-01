@@ -1312,6 +1312,8 @@ source "drivers/input/touchscreen/nt36xxx/Kconfig"
 
 source "drivers/input/touchscreen/focaltech_spi/Kconfig"
 
+source "drivers/input/touchscreen/fts_521/Kconfig"
+
 config TOUCHSCREEN_COMMON
 	bool "Common touchscreen interface to interact with userspace"
 	default y
