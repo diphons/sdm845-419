@@ -1324,6 +1324,8 @@ config INPUT_PRESS_NDT
 
 source "drivers/input/touchscreen/nt36672c/Kconfig"
 
+source "drivers/input/touchscreen/xiaomi/Kconfig"
+
 config TOUCHSCREEN_COMMON
 	bool "Common touchscreen interface to interact with userspace"
 	default y
