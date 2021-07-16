@@ -21,7 +21,6 @@
 #include <linux/slab.h>
 #include <linux/input.h>
 
-
 #define MI_TAG  "[mi-touch]"
 
 #define XIAOMI_TOUCH_DEVICE_NAME "xiaomi-touch"
