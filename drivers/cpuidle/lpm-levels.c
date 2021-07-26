@@ -83,12 +83,6 @@ uint32_t register_system_pm_ops(struct system_pm_ops *pm_ops)
 	return 0;
 }
 
-void lpm_disable_for_dev(bool on, char event_dev)
-{
-	// Do nothing
-}
-EXPORT_SYMBOL(lpm_disable_for_dev);
-
 static int lpm_dying_cpu(unsigned int cpu)
 {
 	struct lpm_cluster *cluster = per_cpu(cpu_lpm, cpu)->parent;
