@@ -38,6 +38,9 @@
 #define ELF_BDF_FILE_NAME_K11A_GLOBAL	 "bd_k11agl.elf"
 #define ELF_BDF_FILE_NAME_K11A_INDIA	 "bd_k11ain.elf"
 
+#define ELF_BDF_FILE_NAME_K81            "bd_k81.elf"
+#define ELF_BDF_FILE_NAME_K81A           "bd_k81a.elf"
+
 #define ELF_BDF_FILE_NAME_PREFIX	"bdwlan.e"
 #define ELF_BDF_FILE_NAME_GF_PREFIX	"bdwlang.e"
 #define BIN_BDF_FILE_NAME		"bdwlan.bin"
@@ -571,6 +574,10 @@ static int cnss_get_bdf_file_name(struct cnss_plat_data *plat_priv,
 				    snprintf(filename_tmp, filename_len, ELF_BDF_FILE_NAME_K11A_INDIA);
 				else
 				    snprintf(filename_tmp, filename_len, ELF_BDF_FILE_NAME_K11A);
+			} else if (hw_platform_ver == HARDWARE_PLATFORM_ENUMA) {
+				snprintf(filename_tmp, filename_len, ELF_BDF_FILE_NAME_K81);
+			} else if (hw_platform_ver == HARDWARE_PLATFORM_ELISH) {
+				snprintf(filename_tmp, filename_len, ELF_BDF_FILE_NAME_K81A);
 			} else if (plat_priv->chip_info.chip_id & CHIP_ID_GF_MASK) {
 				snprintf(filename_tmp, filename_len,
 					 ELF_BDF_FILE_NAME_GF);
