@@ -641,6 +641,12 @@ config MOTOR_DRV8846
 	help
 	  Say Y here if you want to enable TI-drv8846 Stepper motor.
 
+config PERF_HELPER
+	tristate "Record perflock messages"
+	default y
+	help
+	  this module support record perf lock history and other perf messages.
+
 config SPI_XIAOMI_TP
 	bool
 	depends on SPI
