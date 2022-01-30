@@ -1302,6 +1302,15 @@ config TOUCHSCREEN_ROHM_BU21023
 	  To compile this driver as a module, choose M here: the
 	  module will be called bu21023_ts.
 
+config SECURE_TOUCH
+	bool "Secure Touch support for Xiaomi Touchscreen"
+	help
+          Say Y here
+	  -Goodix touch driver is connected
+	  -To enable secure touch for Goodix touch driver
+
+	  If unsure, say N.
+
 source "drivers/input/touchscreen/st/Kconfig"
 
 source "drivers/input/touchscreen/synaptics_dsx/Kconfig"
@@ -1315,6 +1324,8 @@ source "drivers/input/touchscreen/nt36xxx/Kconfig"
 source "drivers/input/touchscreen/focaltech_spi/Kconfig"
 
 source "drivers/input/touchscreen/fts_521/Kconfig"
+
+source "drivers/input/touchscreen/fts_spi/Kconfig"
 
 source "drivers/input/touchscreen/goodix_driver_gt9886/Kconfig"
 
