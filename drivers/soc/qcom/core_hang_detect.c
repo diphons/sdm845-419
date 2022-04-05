@@ -256,7 +256,6 @@ static int msm_hang_detect_probe(struct platform_device *pdev)
 	struct hang_detect *hang_det = NULL;
 	int cpu, ret, cpu_count = 0, cluster_cpu_count = 0, num_regs = 0;
 	const char *name;
-	const char *name;
 	u32 *treg, *creg;
 	u32 fw_cluster_id;
 
