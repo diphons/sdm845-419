@@ -7063,6 +7063,7 @@ static void bfq_exit_queue(struct elevator_queue *e)
 	spin_unlock_irq(&bfqd->lock);
 #endif
 
+	blk_stat_disable_accounting(bfqd->queue);
 	wbt_enable_default(bfqd->queue);
 
 	kfree(bfqd);
@@ -7206,6 +7207,8 @@ static int bfq_init_queue(struct request_queue *q, struct elevator_type *e)
 	bfq_init_entity(&bfqd->oom_bfqq.entity, bfqd->root_group);
 
 	wbt_disable_default(q);
+	blk_stat_enable_accounting(q);
+
 	return 0;
 
 out_free:
