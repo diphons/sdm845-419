@@ -778,7 +778,7 @@ static int memlat_mon_probe(struct platform_device *pdev, bool is_compute)
 		return -ENODEV;
 	}
 
-	mutex_lock(&cpu_grp->mons_lock);
+	mutex_lock_nested(&cpu_grp->mons_lock, SINGLE_DEPTH_NESTING);
 	mon = &cpu_grp->mons[cpu_grp->num_inited_mons];
 	spin_lock_irqsave(&cpu_grp->mon_active_lock, flags);
 	mon->is_active = false;
