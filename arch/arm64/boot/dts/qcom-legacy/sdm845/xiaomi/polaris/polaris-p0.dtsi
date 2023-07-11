@@ -106,25 +106,12 @@
 
 &pmi8998_wled {
 	status = "okay";
-	qcom,fs-curr-ua = <20000>;
-	qcom,led-strings-list = [00 01 02 03];
-	qcom,ovp-mv = <19600>;
+	linux,name = "wled";
+	qcom,fs-current-limit = <20000>;
+	qcom,string-cfg = <15>;
+	qcom,ovp = <19600>;
 	qcom,en-cabc;
-	qcom,switch-freq-khz = <600>;
-};
-
-&red_led {
-	linux,name = "white";
-	qcom,start-idx = <1>;
-	qcom,idx-len = <18>;
-	qcom,duty-pcts = [00 01 02 03 04 05 06 07 08
-			08 07 06 05 04 03 02 01 00];
-	qcom,lut-flags = <3>;
-	qcom,pause-lo = <0>;
-	qcom,pause-hi = <0>;
-	qcom,ramp-step-ms = <142>;
-	qcom,use-blink;
-	status = "okay";
+	qcom,switching-freq = <600>;
 };
 
 &disp_vci_vreg {
@@ -340,26 +327,23 @@
 };
 
 &pm8998_vadc {
-	chan@4e {
+	cam_therm1 {
 		label = "cam_therm1";
-		reg = <0x4e>;
-		qcom,decimation = <2>;
-		qcom,pre-div-channel-scaling = <0>;
-		qcom,calibration-type = "ratiometric";
-		qcom,scale-function = <2>;
-		qcom,hw-settle-time = <2>;
-		qcom,fast-avg-setup = <0>;
+		reg = <ADC_AMUX_THM2_PU2>;
+		qcom,ratiometric;
+		qcom,hw-settle-time = <200>;
+		qcom,pre-scaling = <1 1>;
+		/* qcom,scale-function = <26>; */
 	};
 };
 
 &pm8998_adc_tm {
-	chan@4e {
+	cam_therm1 {
 		label = "cam_therm1";
-		reg = <0x4e>;
-		qcom,pre-div-channel-scaling = <0>;
-		qcom,calibration-type = "ratiometric";
-		qcom,scale-function = <2>;
-		qcom,hw-settle-time = <2>;
+		reg = <ADC_AMUX_THM2_PU2>;
+		qcom,ratiometric;
+		qcom,pre-scaling = <1 1>;
+		qcom,hw-settle-time = <200>;
 		qcom,btm-channel-number = <0x70>;
 		qcom,thermal-node;
 	};
@@ -369,7 +353,7 @@
 	cam_therm1 {
 		polling-delay-passive = <0>;
 		polling-delay = <0>;
-		thermal-sensors = <&pm8998_adc_tm 0x4e>;
+		thermal-sensors = <&pm8998_adc_tm ADC_AMUX_THM2_PU2>;
 		thermal-governor = "user_space";
 
 		trips {
