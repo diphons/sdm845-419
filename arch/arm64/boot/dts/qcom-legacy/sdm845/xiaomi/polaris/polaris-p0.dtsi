@@ -100,8 +100,8 @@
 	qcom,platform-reset-gpio = <&tlmm 6 0>;
 };
 
-&dsi_jdi_fhd_nt35596s_video_display {
-	qcom,dsi-display-active;
+&sde_dsi {
+	qcom,dsi-default-panel = <&dsi_jdi_fhd_nt35596s_video>;
 };
 
 &pmi8998_wled {

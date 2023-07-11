@@ -107,16 +107,16 @@
 	qcom,platform-te-gpio = <&tlmm 10 0>;
 };
 
-&dsi_samsung_fhd_ea8076_cmd_display {
-	qcom,dsi-display-active;
-};
-
 &dsi_sim_vid {
 	qcom,mdss-dsi-panel-name = "Dummy video mode dsi panel";
 	qcom,panel-supply-entries = <&dsi_amoled_panel_pwr_supply>;
 	qcom,mdss-dsi-bl-pmic-control-type = "bl_ctrl_dcs";
 	qcom,platform-reset-gpio = <&tlmm 6 0>;
 	qcom,mdss-dsi-te-pin-select = <0>;
+};
+
+&sde_dsi {
+	qcom,dsi-default-panel = <&dsi_samsung_fhd_ea8076_cmd>;
 };
 
 &pm8998_l28{

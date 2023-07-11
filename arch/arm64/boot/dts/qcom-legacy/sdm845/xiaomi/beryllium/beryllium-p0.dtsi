@@ -83,14 +83,15 @@
 	qcom,platform-reset-gpio = <&tlmm 6 0>;
 };
 
-&dsi_tianma_fhd_nt36672a_video_display {
-	qcom,dsi-display-active;
-};
-
 &dsi_ebbg_fhd_ft8719_video {
 	qcom,panel-supply-entries = <&dsi_ft8719_panel_pwr_supply>;
 	qcom,mdss-dsi-bl-pmic-control-type = "bl_ctrl_wled";
 	qcom,platform-reset-gpio = <&tlmm 6 0>;
+};
+
+&sde_dsi {
+	/delete-property/ qcom,platform-te-gpio;
+	qcom,dsi-default-panel = <&dsi_tianma_fhd_nt36672a_video>;
 };
 
 &pmi8998_wled {
