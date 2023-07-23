@@ -6662,7 +6662,8 @@ static void bfq_finish_requeue_request(struct request *rq)
 			bfq_update_inject_limit(bfqd, bfqq);
 
 		bfq_completed_request(bfqq, bfqd);
-		bfq_finish_requeue_request_body(bfqq);
+		bfqq_request_freed(bfqq);
+	    bfq_put_queue(bfqq);
 
 		spin_unlock_irqrestore(&bfqd->lock, flags);
 	} else {
