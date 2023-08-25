@@ -313,8 +313,6 @@ enum WMI_RECORD_TYPE {
 	WMI_EVT = 2,
 };
 
-#endif /*WMI_INTERFACE_EVENT_LOGGING */
-
 #ifdef WLAN_OPEN_SOURCE
 struct fwdebug {
 	struct sk_buff_head fwlog_queue;
