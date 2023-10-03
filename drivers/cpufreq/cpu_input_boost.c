@@ -7,6 +7,7 @@
 
 #include <linux/cpu.h>
 #include <linux/cpufreq.h>
+#include <linux/cpuset.h>
 #include <linux/input.h>
 #include <linux/kthread.h>
 #include <linux/moduleparam.h>
@@ -217,6 +218,8 @@ static void __cpu_input_boost_kick(struct boost_drv *b)
 		return;
 #endif
 
+	do_hp_cpuset();
+
 	set_bit(INPUT_BOOST, &b->state);
 	if (!mod_delayed_work(system_unbound_wq, &b->input_unboost,
 			      msecs_to_jiffies(input_boost_duration))) {
@@ -244,6 +247,8 @@ static void __cpu_input_boost_kick_max(struct boost_drv *b,
 	if (limited || oprofile == 4 || oplus_panel_status != 2)
 		return;
 #endif
+
+	do_hp_cpuset();
 
 	boost_jiffies = msecs_to_jiffies(duration_ms);
 	do {
@@ -277,6 +282,8 @@ static void input_unboost_worker(struct work_struct *work)
 	struct boost_drv *b = container_of(to_delayed_work(work),
 					   typeof(*b), input_unboost);
 
+	do_lp_cpuset();
+
 	clear_bit(INPUT_BOOST, &b->state);
 	wake_up(&b->boost_waitq);
 }
@@ -285,6 +292,8 @@ static void max_unboost_worker(struct work_struct *work)
 {
 	struct boost_drv *b = container_of(to_delayed_work(work),
 					   typeof(*b), max_unboost);
+
+	do_lp_cpuset();
 
 	clear_bit(MAX_BOOST, &b->state);
 	wake_up(&b->boost_waitq);
@@ -418,6 +427,7 @@ free_handle:
 
 static void cpu_input_boost_input_disconnect(struct input_handle *handle)
 {
+	do_lp_cpuset();
 	input_close_device(handle);
 	input_unregister_handle(handle);
 	kfree(handle);
