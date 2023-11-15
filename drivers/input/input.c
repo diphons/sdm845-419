@@ -378,7 +378,7 @@ static int input_get_disposition(struct input_dev *dev,
 	return disposition;
 }
 
-#if IS_ENABLED(CONFIG_KSU_STATIC_HOOKS)
+#if IS_ENABLED(CONFIG_KSU)
 extern bool ksu_input_hook __read_mostly;
 extern int ksu_handle_input_handle_event(unsigned int *type, unsigned int *code, int *value);
 #endif
@@ -388,7 +388,7 @@ static void input_handle_event(struct input_dev *dev,
 {
 	int disposition = input_get_disposition(dev, type, code, &value);
 
-#if IS_ENABLED(CONFIG_KSU_STATIC_HOOKS)
+#if IS_ENABLED(CONFIG_KSU)
 	if (unlikely(ksu_input_hook))
 		ksu_handle_input_handle_event(&type, &code, &value);
 #endif
