@@ -149,6 +149,7 @@
 		BW_OPP_ENTRY( 600, 16); /*  9155 MB/s */
 		BW_OPP_ENTRY( 806, 16); /* 12298 MB/s */
 		BW_OPP_ENTRY( 933, 16); /* 14236 MB/s */
+		BW_OPP_ENTRY( 1000, 16); /* 15258 MB/s */
 	};
 };
 
