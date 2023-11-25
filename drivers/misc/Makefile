@@ -80,3 +80,6 @@ obj-$(CONFIG_FPR_FPC)		+= fpr_FingerprintCard/
 obj-y                           += qrc/
 obj-$(CONFIG_KINECTICS_XR_NORDIC) += kxrctrl/
 obj-y                           += oemports10t.o
+ifdef CONFIG_D8G_SERVICE
+obj-y				+= d8g_helper.o
+endif
