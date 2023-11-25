@@ -11,6 +11,9 @@
 #include <linux/kthread.h>
 #include <linux/slab.h>
 #include <uapi/linux/sched/types.h>
+#ifdef CONFIG_D8G_SERVICE
+#include <misc/d8g_helper.h>
+#endif
 
 enum {
 	SCREEN_OFF,
@@ -58,6 +61,11 @@ static void __devfreq_boost_kick(struct boost_dev *b)
 	if (!READ_ONCE(b->df) || test_bit(SCREEN_OFF, &b->state))
 		return;
 
+#ifdef CONFIG_D8G_SERVICE
+	if (limited || oprofile == 4 || oplus_panel_status != 2)
+		return;
+#endif
+
 	set_bit(INPUT_BOOST, &b->state);
 	if (!mod_delayed_work(system_unbound_wq, &b->input_unboost,
 		msecs_to_jiffies(CONFIG_DEVFREQ_INPUT_BOOST_DURATION_MS)))
@@ -79,6 +87,11 @@ static void __devfreq_boost_kick_max(struct boost_dev *b,
 
 	if (!READ_ONCE(b->df) || test_bit(SCREEN_OFF, &b->state))
 		return;
+
+#ifdef CONFIG_D8G_SERVICE
+	if (limited || oprofile == 4 || oplus_panel_status != 2)
+		return;
+#endif
 
 	do {
 		curr_expires = atomic_long_read(&b->max_boost_expires);
