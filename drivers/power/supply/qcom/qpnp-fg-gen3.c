@@ -623,8 +623,11 @@ static int fg_get_battery_temp(struct fg_dev *fg, int *val)
 
 	temp = ((buf[1] & BATT_TEMP_MSB_MASK) << 8) |
 		(buf[0] & BATT_TEMP_LSB_MASK);
-	/* Value is in 0.25Kelvin; Convert it to deciDegC */
-	*val = DIV_ROUND_CLOSEST((temp - 273*4) * 10, 4);
+	temp = DIV_ROUND_CLOSEST(temp, 4);
+
+	/* Value is in Kelvin; Convert it to deciDegC */
+	temp = (temp - 273) * 10;
+	*val = temp;
 	return 0;
 }
 
@@ -5600,7 +5603,7 @@ static void soc_work_fn(struct work_struct *work)
 		prev_soc = msoc;
 	}
 
-	schedule_delayed_work(
+	queue_delayed_work(system_power_efficient_wq, 
 		&fg->soc_work,
 		msecs_to_jiffies(SOC_WORK_MS));
 
@@ -5779,7 +5782,7 @@ static void soc_monitor_work(struct work_struct *work)
 	pr_info("soc:%d, raw_soc:%d, c:%d, s:%d\n",
 				fg->param.batt_soc, fg->param.batt_raw_soc,
 				fg->param.batt_ma, fg->charge_status);
-	schedule_delayed_work(&fg->soc_monitor_work,
+	queue_delayed_work(system_power_efficient_wq, &fg->soc_monitor_work,
 				msecs_to_jiffies(MONITOR_SOC_WAIT_PER_MS));
 }
 
