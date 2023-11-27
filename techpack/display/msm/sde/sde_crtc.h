@@ -259,7 +259,8 @@ struct sde_crtc_misr_info {
  * @frame_pending : Whether or not an update is pending
  * @frame_events  : static allocation of in-flight frame events
  * @frame_event_list : available frame event list
- * @spin_lock     : spin lock for frame event, transaction status, etc...
+ * @spin_lock     : spin lock for transaction status, etc...
+ * @fevent_spin_lock     : spin lock for frame event
  * @event_thread  : Pointer to event handler thread
  * @event_worker  : Event worker queue
  * @event_cache   : Local cache of event worker structures
@@ -287,6 +288,7 @@ struct sde_crtc_misr_info {
  * @ltm_lock        : Spinlock to protect ltm buffer_cnt, hist_en and ltm lists
  * @needs_hw_reset  : Initiate a hw ctl reset
  * @comp_ratio      : Compression ratio
+ * @hist_irq_idx    : hist interrupt irq idx
  * @dspp_blob_info  : blob containing dspp hw capability information
  */
 struct sde_crtc {
@@ -340,6 +342,7 @@ struct sde_crtc {
 	struct sde_crtc_frame_event frame_events[SDE_CRTC_FRAME_EVENT_SIZE];
 	struct list_head frame_event_list;
 	spinlock_t spin_lock;
+	spinlock_t fevent_spin_lock;
 
 	/* for handling internal event thread */
 	struct sde_crtc_event event_cache[SDE_CRTC_MAX_EVENT_COUNT];
@@ -374,8 +377,10 @@ struct sde_crtc {
 	struct mutex ltm_buffer_lock;
 	spinlock_t ltm_lock;
 	bool needs_hw_reset;
+	int hist_irq_idx;
 
 	int comp_ratio;
+	uint32_t mi_dimlayer_type;
 
 	struct drm_property_blob *dspp_blob_info;
 };
@@ -453,8 +458,8 @@ struct sde_crtc_mi_state {
  * @ds_cfg: Destination scaler config
  * @scl3_lut_cfg: QSEED3 lut config
  * @new_perf: new performance state being requested
- * @secure_session: Indicates the type of secure session
  * @mi_state: Mi part of crtc state
+ * @secure_session: Indicates the type of secure session
  */
 struct sde_crtc_state {
 	struct drm_crtc_state base;
@@ -477,6 +482,7 @@ struct sde_crtc_state {
 	uint64_t input_fence_timeout_ns;
 	uint32_t num_dim_layers;
 	struct sde_hw_dim_layer dim_layer[SDE_MAX_DIM_LAYERS];
+	struct sde_hw_dim_layer *fod_dim_layer;
 	uint32_t num_ds;
 	uint32_t num_ds_enabled;
 	bool ds_dirty;
@@ -484,10 +490,11 @@ struct sde_crtc_state {
 	struct sde_hw_scaler3_lut_cfg scl3_lut_cfg;
 
 	struct sde_core_perf_params new_perf;
-	int secure_session;
-	/* Mi crtc state */
+    /* Mi crtc state */
 	struct sde_crtc_mi_state mi_state;
 	uint32_t num_dim_layers_bank;
+  
+	int secure_session;
 };
 
 enum sde_crtc_irq_state {

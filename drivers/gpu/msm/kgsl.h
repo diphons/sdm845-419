@@ -1,7 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2008-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 #ifndef __KGSL_H
 #define __KGSL_H
@@ -58,11 +57,13 @@
 /*
  * SCRATCH MEMORY: The scratch memory is one page worth of data that
  * is mapped into the GPU. This allows for some 'shared' data between
- * the GPU and CPU.
+ * the GPU and CPU. For example, it will be used by the GPU to write
+ * each updated RPTR for each RB.
  *
  * Used Data:
  * Offset: Length(bytes): What
  * 0x0: 4 * KGSL_PRIORITY_MAX_RB_LEVELS: RB0 RPTR
+ * 0x10: 8 * KGSL_PRIORITY_MAX_RB_LEVELS: RB0 CTXT RESTORE ADDR
  */
 
 /* Shadow global helpers */
@@ -70,10 +71,12 @@
 #define SCRATCH_RPTR_GPU_ADDR(dev, id) \
 	((dev)->scratch.gpuaddr + SCRATCH_RPTR_OFFSET(id))
 
-/* OFFSET to KMD postamble packets in scratch buffer */
-#define SCRATCH_POSTAMBLE_OFFSET (100 * sizeof(u64))
-#define SCRATCH_POSTAMBLE_ADDR(dev) \
-	((dev)->scratch.gpuaddr + SCRATCH_POSTAMBLE_OFFSET)
+#define SCRATCH_PREEMPTION_CTXT_RESTORE_ADDR_OFFSET(id) \
+	(SCRATCH_RPTR_OFFSET(KGSL_PRIORITY_MAX_RB_LEVELS) + \
+	((id) * sizeof(uint64_t)))
+#define SCRATCH_PREEMPTION_CTXT_RESTORE_GPU_ADDR(dev, id) \
+	((dev)->scratch.gpuaddr + \
+	SCRATCH_PREEMPTION_CTXT_RESTORE_ADDR_OFFSET(id))
 
 /* Timestamp window used to detect rollovers (half of integer range) */
 #define KGSL_TIMESTAMP_WINDOW 0x80000000
@@ -194,8 +197,6 @@ struct kgsl_memdesc_ops {
 #define KGSL_MEMDESC_RECLAIMED BIT(12)
 /* Skip reclaim of the memdesc pages */
 #define KGSL_MEMDESC_SKIP_RECLAIM BIT(13)
-/* Use SHMEM for allocation */
-#define KGSL_MEMDESC_USE_SHMEM BIT(14)
 
 /**
  * struct kgsl_memdesc - GPU memory object descriptor
@@ -431,20 +432,6 @@ long kgsl_ioctl_gpu_command(struct kgsl_device_private *dev_priv,
 				unsigned int cmd, void *data);
 long kgsl_ioctl_gpuobj_set_info(struct kgsl_device_private *dev_priv,
 				unsigned int cmd, void *data);
-long kgsl_ioctl_gpu_aux_command(struct kgsl_device_private *dev_priv,
-		unsigned int cmd, void *data);
-long kgsl_ioctl_timeline_create(struct kgsl_device_private *dev_priv,
-		unsigned int cmd, void *data);
-long kgsl_ioctl_timeline_wait(struct kgsl_device_private *dev_priv,
-		unsigned int cmd, void *data);
-long kgsl_ioctl_timeline_query(struct kgsl_device_private *dev_priv,
-		unsigned int cmd, void *data);
-long kgsl_ioctl_timeline_fence_get(struct kgsl_device_private *dev_priv,
-		unsigned int cmd, void *data);
-long kgsl_ioctl_timeline_signal(struct kgsl_device_private *dev_priv,
-		unsigned int cmd, void *data);
-long kgsl_ioctl_timeline_destroy(struct kgsl_device_private *dev_priv,
-		unsigned int cmd, void *data);
 
 long kgsl_ioctl_sparse_phys_alloc(struct kgsl_device_private *dev_priv,
 					unsigned int cmd, void *data);
@@ -565,18 +552,19 @@ static inline void kgsl_schedule_work(struct work_struct *work)
 	queue_work(kgsl_driver.workqueue, work);
 }
 
-static inline int
+static inline struct kgsl_mem_entry *
 kgsl_mem_entry_get(struct kgsl_mem_entry *entry)
 {
-	if (entry)
-		return kref_get_unless_zero(&entry->refcount);
-	return 0;
+	if (!IS_ERR_OR_NULL(entry) && kref_get_unless_zero(&entry->refcount))
+		return entry;
+
+	return NULL;
 }
 
 static inline void
 kgsl_mem_entry_put(struct kgsl_mem_entry *entry)
 {
-	if (entry)
+	if (!IS_ERR_OR_NULL(entry))
 		kref_put(&entry->refcount, kgsl_mem_entry_destroy);
 }
 

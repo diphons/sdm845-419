@@ -95,7 +95,6 @@ static int msm_notifier_fps_chg_callback(struct notifier_block *nb,
 				notifier_data->refresh_rate, max_fps);
 
 		active_displays->max_fps = max_fps;
-		sched_set_refresh_rate(max_fps);
 	}
 
 	return 0;
@@ -130,7 +129,6 @@ static int msm_notifier_probe(struct platform_device *pdev)
 
 	active_displays = devm_kzalloc(&pdev->dev,
 				sizeof(*active_displays), GFP_KERNEL);
-
 	if (!active_displays) {
 		ret = -ENOMEM;
 		goto end;
@@ -181,7 +179,6 @@ fail:
 	devm_kfree(&pdev->dev, active_displays);
 end:
 	devm_kfree(&pdev->dev, info);
-
 	return ret;
 }
 

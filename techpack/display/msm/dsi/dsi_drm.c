@@ -15,8 +15,9 @@
 #include <drm/drm_bridge.h>
 #include <linux/pm_wakeup.h>
 #include "msm_drv.h"
-#include "sde_dbg.h"
 #include "dsi_defs.h"
+#include "sde_encoder.h"
+#include "dsi_mi_feature.h"
 
 #define to_dsi_bridge(x)     container_of((x), struct dsi_bridge, base)
 #define to_dsi_state(x)      container_of((x), struct dsi_connector_state, base)
@@ -193,6 +194,7 @@ static void dsi_bridge_pre_enable(struct drm_bridge *bridge)
 
 	if (bridge->encoder->crtc->state->active_changed)
 		atomic_set(&c_bridge->display->panel->esd_recovery_pending, 0);
+
 	mi_cfg = &c_bridge->display->panel->mi_cfg;
 
 	/* By this point mode should have been validated through mode_fixup */
@@ -334,6 +336,9 @@ static void dsi_bridge_enable(struct drm_bridge *bridge)
 		DSI_ERR("[%d] DSI display post enabled failed, rc=%d\n",
 		       c_bridge->id, rc);
 
+	if (display)
+		display->enabled = true;
+
 	if (display && display->drm_conn) {
 		sde_connector_helper_bridge_enable(display->drm_conn);
 		if (c_bridge->dsi_mode.dsi_mode_flags & DSI_MODE_FLAG_POMS)
@@ -341,6 +346,10 @@ static void dsi_bridge_enable(struct drm_bridge *bridge)
 				true);
 	}
 
+	rc = dsi_display_esd_irq_ctrl(c_bridge->display, true);
+	if (rc)
+		DSI_ERR("[%d] DSI display enable esd irq failed, rc=%d\n",
+				c_bridge->id, rc);
 }
 
 static void dsi_bridge_disable(struct drm_bridge *bridge)
@@ -348,15 +357,40 @@ static void dsi_bridge_disable(struct drm_bridge *bridge)
 	int rc = 0;
 	int private_flags;
 	struct dsi_display *display;
+	struct mi_drm_notifier notify_data;
+	struct dsi_panel_mi_cfg *mi_cfg = NULL;
+	int power_mode = 0;
 	struct dsi_bridge *c_bridge = to_dsi_bridge(bridge);
 
 	if (!bridge) {
 		DSI_ERR("Invalid params\n");
 		return;
 	}
+
+	mi_cfg = &c_bridge->display->panel->mi_cfg;
+
+	if (mi_cfg->fod_dimlayer_enabled) {
+		power_mode = sde_connector_get_lp(c_bridge->display->drm_conn);
+	} else {
+		power_mode = MI_DRM_BLANK_POWERDOWN;
+	}
+
+	notify_data.data = &power_mode;
+	notify_data.id = MSM_DRM_PRIMARY_DISPLAY;
+	mi_drm_notifier_call_chain(MI_DRM_PRE_EVENT_BLANK, &notify_data);
+
 	display = c_bridge->display;
 	private_flags =
 		bridge->encoder->crtc->state->adjusted_mode.private_flags;
+
+	if (display)
+		display->enabled = false;
+
+	rc = dsi_display_esd_irq_ctrl(c_bridge->display, false);
+	if (rc) {
+		DSI_ERR("[%d] DSI display disable esd irq failed, rc=%d\n",
+				c_bridge->id, rc);
+	}
 
 	if (display && display->drm_conn) {
 		display->poms_pending =
@@ -387,11 +421,10 @@ static void dsi_bridge_post_disable(struct drm_bridge *bridge)
 
 	mi_cfg = &c_bridge->display->panel->mi_cfg;
 
-	if (mi_cfg->fod_dimlayer_enabled) {
+	if (mi_cfg->fod_dimlayer_enabled)
 		power_mode = sde_connector_get_lp(c_bridge->display->drm_conn);
-	} else {
+	else
 		power_mode = MI_DRM_BLANK_POWERDOWN;
-	}
 
 	notify_data.data = &power_mode;
 	notify_data.id = MSM_DRM_PRIMARY_DISPLAY;
@@ -534,16 +567,8 @@ static bool dsi_bridge_mode_fixup(struct drm_bridge *bridge,
 		if ((dsi_mode.panel_mode != cur_dsi_mode.panel_mode) &&
 			(!(dsi_mode.dsi_mode_flags & DSI_MODE_FLAG_VRR)) &&
 			(crtc_state->enable ==
-				crtc_state->crtc->state->enable)) {
+				crtc_state->crtc->state->enable))
 			dsi_mode.dsi_mode_flags |= DSI_MODE_FLAG_POMS;
-
-			SDE_EVT32(SDE_EVTLOG_FUNC_CASE1,
-				dsi_mode.timing.h_active,
-				dsi_mode.timing.v_active,
-				dsi_mode.timing.refresh_rate,
-				dsi_mode.pixel_clk_khz,
-				dsi_mode.panel_mode);
-		}
 		/* No DMS/VRR when drm pipeline is changing */
 		if (!drm_mode_equal(cur_mode, adjusted_mode) &&
 			(!(dsi_mode.dsi_mode_flags & DSI_MODE_FLAG_VRR)) &&
@@ -551,16 +576,8 @@ static bool dsi_bridge_mode_fixup(struct drm_bridge *bridge,
 			(!(dsi_mode.dsi_mode_flags & DSI_MODE_FLAG_DYN_CLK)) &&
 			(!crtc_state->active_changed ||
 			 display->is_cont_splash_enabled) &&
-			 display->config.panel_mode == DSI_OP_CMD_MODE) {
+			 display->config.panel_mode == DSI_OP_CMD_MODE)
 			dsi_mode.dsi_mode_flags |= DSI_MODE_FLAG_DMS;
-
-			SDE_EVT32(SDE_EVTLOG_FUNC_CASE2,
-				dsi_mode.timing.h_active,
-				dsi_mode.timing.v_active,
-				dsi_mode.timing.refresh_rate,
-				dsi_mode.pixel_clk_khz,
-				dsi_mode.panel_mode);
-		}
 	}
 
 	/* Reject seamless transition when active changed */
@@ -1102,8 +1119,9 @@ int dsi_conn_post_kickoff(struct drm_connector *connector,
 	struct dsi_display_mode adj_mode;
 	struct dsi_display *display;
 	struct dsi_display_ctrl *m_ctrl, *ctrl;
-	int i, rc = 0;
+	int i, rc = 0, ctrl_version;
 	bool enable;
+	struct dsi_dyn_clk_caps *dyn_clk_caps;
 
 	if (!connector || !connector->state) {
 		DSI_ERR("invalid connector or connector state\n");
@@ -1119,14 +1137,27 @@ int dsi_conn_post_kickoff(struct drm_connector *connector,
 	c_bridge = to_dsi_bridge(encoder->bridge);
 	adj_mode = c_bridge->dsi_mode;
 	display = c_bridge->display;
+	dyn_clk_caps = &(display->panel->dyn_clk_caps);
 
 	if (adj_mode.dsi_mode_flags & DSI_MODE_FLAG_VRR) {
 		m_ctrl = &display->ctrl[display->clk_master_idx];
+		ctrl_version = m_ctrl->ctrl->version;
 		rc = dsi_ctrl_timing_db_update(m_ctrl->ctrl, false);
 		if (rc) {
 			DSI_ERR("[%s] failed to dfps update  rc=%d\n",
 				display->name, rc);
 			return -EINVAL;
+		}
+
+		if ((ctrl_version >= DSI_CTRL_VERSION_2_4) &&
+				(dyn_clk_caps->maintain_const_fps)) {
+			display_for_each_ctrl(i, display) {
+				ctrl = &display->ctrl[i];
+				rc = dsi_ctrl_wait4dynamic_refresh_done(
+						ctrl->ctrl);
+				if (rc)
+					DSI_ERR("wait4dfps refresh failed\n");
+			}
 		}
 
 		/* Update the rest of the controllers */

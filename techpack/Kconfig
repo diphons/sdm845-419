@@ -1,9 +1,9 @@
-menu "Tech packages"
+source techpack/data/Kconfig
+source techpack/mi845/Kconfig
+source techpack/wlan/Kconfig
 
-source "techpack/data/Kconfig"
-
-source "techpack/mi845/Kconfig"
-
-source "techpack/wlan/Kconfig"
-
-endmenu
+config OSSFOD
+	bool "OSS FOD support"
+	depends on BOARD_XIAOMI
+	help
+	  When this option is enabled, OSS FOD support will be added.
