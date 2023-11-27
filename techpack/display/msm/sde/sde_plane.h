@@ -36,6 +36,7 @@
 #define SDE_PLANE_DIRTY_VIG_IGC 0x40
 #define SDE_PLANE_DIRTY_DMA_IGC 0x80
 #define SDE_PLANE_DIRTY_DMA_GC 0x100
+#define SDE_PLANE_DIRTY_QOS     0x200
 #define SDE_PLANE_DIRTY_CP (SDE_PLANE_DIRTY_VIG_GAMUT |\
 		SDE_PLANE_DIRTY_VIG_IGC | SDE_PLANE_DIRTY_DMA_IGC |\
 		SDE_PLANE_DIRTY_DMA_GC)
@@ -313,5 +314,7 @@ bool sde_plane_is_cache_required(struct drm_plane *plane);
  * @plane: Pointer to DRM plane object
  */
 uint32_t sde_plane_get_mi_layer_info(const struct drm_plane_state *drm_state);
+
+int sde_plane_is_fod_layer(const struct drm_plane_state *drm_state);
 
 #endif /* _SDE_PLANE_H_ */

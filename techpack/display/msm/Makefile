@@ -70,9 +70,11 @@ msm_drm-$(CONFIG_DRM_MSM_SDE) += sde/sde_crtc.o \
 	sde/sde_hw_ds.o \
 	sde/sde_fence.o \
 	sde/sde_hw_qdss.o \
-	sde_dbg.o \
-	sde_dbg_evtlog.o \
 	sde/sde_hw_rc.o \
+
+msm_drm-$(CONFIG_DEBUG_FS) += \
+	sde_dbg.o \
+	sde_dbg_evtlog.o
 
 msm_drm-$(CONFIG_DRM_SDE_WB) += sde/sde_wb.o \
 	sde/sde_encoder_phys_wb.o \
@@ -104,6 +106,7 @@ msm_drm-$(CONFIG_DRM_MSM_DSI) += dsi/dsi_phy.o \
 	dsi/dsi_display_test.o \
 	dsi/dsi_display_mi.o \
 	dsi/dsi_panel_mi.o \
+	dsi/mi_disp_lhbm.o \
 
 msm_drm-$(CONFIG_DSI_PARSER) += dsi/dsi_parser.o \
 
