@@ -731,6 +731,7 @@ CONFIG_CMDLINE_EXTEND=y
 CONFIG_JUMP_LABEL=y
 CONFIG_HAVE_MOVE_PUD=y
 CONFIG_HAVE_MOVE_PMD=y
+CONFIG_BLOCK_UNWANTED_FILES=y
 
 #
 # ARM errata workarounds via the alternatives framework
