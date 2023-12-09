@@ -21,6 +21,9 @@ fw-external-y := $(subst $(quote),,$(CONFIG_EXTRA_FIRMWARE))
 # accurate. In the latter case it doesn't matter -- it'll use $(fw-shipped-all).
 # But be aware that the config file might not be included at all.
 
+fw-shipped-$(CONFIG_TOUCHSCREEN_NT36XXX_MI845) += novatek_nt36672_e10.fw novatek_nt36672_e10_hw01.fw \
+						novatek_nt36672_e10_hw02.fw
+
 fw-shipped-all := $(fw-shipped-y) $(fw-shipped-m) $(fw-shipped-)
 
 quiet_cmd_ihex  = IHEX    $@
