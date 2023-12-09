@@ -37,6 +37,9 @@ fw-shipped-$(CONFIG_TOUCHSCREEN_FOCALTECH) += focaltech_ts_fw.bin
 
 fw-shipped-$(CONFIG_TOUCHSCREEN_HIMAX_CHIPSET) += Himax_firmware.bin
 
+fw-shipped-$(CONFIG_TOUCHSCREEN_NT36XXX_MI845) += novatek_nt36672_e10.fw novatek_nt36672_e10_hw01.fw \
+						novatek_nt36672_e10_hw02.fw
+
 fw-shipped-all := $(fw-shipped-y) $(fw-shipped-m) $(fw-shipped-)
 
 quiet_cmd_ihex  = IHEX    $@
