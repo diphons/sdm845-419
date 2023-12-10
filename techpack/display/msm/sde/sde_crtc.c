@@ -1,4 +1,5 @@
-/*
+
+#include <linux/devfreq_boost.h>/*
  * Copyright (c) 2014-2021 The Linux Foundation. All rights reserved.
  * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (C) 2013 Red Hat
@@ -27,6 +28,7 @@
 #include <drm/drm_crtc_helper.h>
 #include <drm/drm_flip_work.h>
 #include <linux/clk/qcom.h>
+#include <linux/devfreq_boost.h>
 
 #include "sde_kms.h"
 #include "sde_hw_lm.h"
@@ -3641,6 +3643,8 @@ void sde_crtc_commit_kickoff(struct drm_crtc *crtc,
 		return;
 
 	SDE_ATRACE_BEGIN("crtc_commit");
+
+	devfreq_boost_kick(DEVFREQ_CPU_LLCC_DDR_BW);
 
 	idle_pc_state = sde_crtc_get_property(cstate, CRTC_PROP_IDLE_PC_STATE);
 
