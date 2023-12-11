@@ -54,3 +54,4 @@ int mi_drm_notifier_call_chain(unsigned long val, void *v)
 	return blocking_notifier_call_chain(&mi_drm_notifier_list, val, v);
 }
 EXPORT_SYMBOL(mi_drm_notifier_call_chain);
+

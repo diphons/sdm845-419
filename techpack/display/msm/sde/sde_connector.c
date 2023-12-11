@@ -98,15 +98,19 @@ static int sde_backlight_device_update_status(struct backlight_device *bd)
 			(bd->props.state & BL_CORE_SUSPENDED))
 		brightness = 0;
 
-	if (brightness > display->panel->bl_config.bl_max_level)
-		brightness = display->panel->bl_config.bl_max_level;
+	if (brightness > display->panel->bl_config.brightness_max_level)
+		brightness = display->panel->bl_config.brightness_max_level;
 
-	/* map UI brightness into driver backlight level with rounding */
-	bl_lvl = mult_frac(brightness, display->panel->bl_config.bl_max_level,
-			display->panel->bl_config.brightness_max_level);
+	if (brightness) {
+		int bl_min = display->panel->bl_config.bl_min_level ? : 1;
+		int bl_range = display->panel->bl_config.bl_max_level - bl_min;
 
-	if (!bl_lvl && brightness)
-		bl_lvl = 1;
+		/* map UI brightness into driver backlight level rounding it */
+		bl_lvl = bl_min + DIV_ROUND_CLOSEST((brightness - 1) * bl_range,
+			display->panel->bl_config.brightness_max_level - 1);
+	} else {
+		bl_lvl = 0;
+	}
 
 	if (!c_conn->allow_bl_update) {
 		c_conn->unset_bl_level = bl_lvl;
@@ -781,7 +785,6 @@ void sde_connector_update_fod_hbm(struct drm_connector *connector)
 	struct sde_connector *c_conn;
 	struct dsi_display *display;
 	bool status;
-	struct dsi_panel_mi_cfg *mi_cfg;
 
 	if (!connector) {
 		SDE_ERROR("invalid connector\n");
@@ -803,18 +806,9 @@ void sde_connector_update_fod_hbm(struct drm_connector *connector)
 	if (atomic_xchg(&effective_status, status) == status)
 		return;
 
-	mi_cfg = &display->panel->mi_cfg;
-
-	if ((status && mi_cfg && mi_cfg->delay_before_fod_hbm_on) ||
-			(!status && mi_cfg && mi_cfg->delay_before_fod_hbm_off))
-		sde_encoder_wait_for_event(c_conn->encoder, MSM_ENC_VBLANK);
-
+	mutex_lock(&display->panel->panel_lock);
 	dsi_panel_set_fod_hbm(display->panel, status);
-
-	if ((status && mi_cfg && mi_cfg->delay_after_fod_hbm_on) ||
-			(!status && mi_cfg && mi_cfg->delay_after_fod_hbm_off))
-		sde_encoder_wait_for_event(c_conn->encoder, MSM_ENC_VBLANK);
-
+	mutex_unlock(&display->panel->panel_lock);
 	dsi_display_set_fod_ui(display, status);
 }
 
@@ -884,7 +878,7 @@ int mi_sde_connector_gir_fence(struct drm_connector *connector)
 	c_conn = to_sde_connector(connector);
 
 	if (c_conn->connector_type != DRM_MODE_CONNECTOR_DSI)
-		return 0;
+		return -EINVAL;
 
 	dsi_display = (struct dsi_display *) c_conn->display;
 	if (!dsi_display || !dsi_display->panel) {
@@ -931,6 +925,10 @@ static int _sde_connector_mi_dimlayer_hbm_fence(struct drm_connector *connector)
 	static bool last_layer_aod_flag;
 	bool crc_off_after_delay_of_hbm_on = false;
 	struct dsi_panel_mi_cfg *mi_cfg;
+#if 0
+	bool icon;
+	static bool last_icon = false;
+#endif
 	bool anim;
 	static bool last_anim = false;
 
@@ -958,18 +956,6 @@ static int _sde_connector_mi_dimlayer_hbm_fence(struct drm_connector *connector)
 		return -EINVAL;
 	}
 
-	if (!c_conn->allow_bl_update) {
-		/*Skip 2 frames after panel on to avoid hbm flicker*/
-		if (mi_cfg->dc_type == 1 && dsi_display->panel->power_mode == SDE_MODE_DPMS_ON)
-			skip_frame_count = 2;
-		return 0;
-	}
-
-	if (skip_frame_count) {
-		SDE_INFO("skip_frame_count=%d\n", skip_frame_count);
-		skip_frame_count--;
-		return 0;
-	}
 
 	mi_cfg->layer_fod_unlock_success =
 			c_conn->mi_dimlayer_state.mi_dimlayer_type & MI_FOD_UNLOCK_SUCCESS;
@@ -1002,18 +988,6 @@ static int _sde_connector_mi_dimlayer_hbm_fence(struct drm_connector *connector)
 				c_conn->fod_frame_count = 0;
 			}
 			if (skip == false) {
-				/* dimming off before hbm ctl */
-				if (mi_cfg->prepare_before_fod_hbm_on && ((mi_cfg->panel_id >> 8) == 0x4A3232003808)) {
-					/* Set flags to disable dimming and backlight */
-					mi_cfg->dimming_state = STATE_DIM_BLOCK;
-					mi_cfg->fod_hbm_enabled = true;
-
-					sde_connector_pre_hbm_ctl(connector);
-					sde_encoder_wait_for_event(c_conn->encoder, MSM_ENC_VBLANK);
-				}
-
-				if (mi_cfg->delay_before_fod_hbm_on)
-					sde_encoder_wait_for_event(c_conn->encoder, MSM_ENC_VBLANK);
 
 				if (mi_cfg->fod_dimlayer_enabled)
 					sde_connector_hbm_ctl(connector, DISPPARAM_HBM_FOD_ON);
@@ -1031,10 +1005,6 @@ static int _sde_connector_mi_dimlayer_hbm_fence(struct drm_connector *connector)
 					}
 				}
 
-				if (mi_cfg->delay_after_fod_hbm_on) {
-					sde_encoder_wait_for_event(c_conn->encoder, MSM_ENC_VBLANK);
-				}
-
 				/* Turn off crc after delay of hbm on can avoid flash high
 				 * brightness if DC on (MIUI-1755728) */
 				if (mi_cfg->dc_type == 2 && crc_off_after_delay_of_hbm_on) {
@@ -1045,8 +1015,7 @@ static int _sde_connector_mi_dimlayer_hbm_fence(struct drm_connector *connector)
 				}
 
 				mi_cfg->fod_hbm_layer_enabled = true;
-				/*sde_crtc_fod_ui_ready(dsi_display, 1, 1);*/
-			}
+			}	sde_crtc_fod_ui_ready(dsi_display, 1, 1);
 		}
 	} else {
 		if (mi_cfg->fod_hbm_layer_enabled == true) {
@@ -1062,7 +1031,7 @@ static int _sde_connector_mi_dimlayer_hbm_fence(struct drm_connector *connector)
 				sde_encoder_wait_for_event(c_conn->encoder, MSM_ENC_VBLANK);
 
 			mi_cfg->fod_hbm_layer_enabled = false;
-			/*sde_crtc_fod_ui_ready(dsi_display, 1, 0);*/
+			sde_crtc_fod_ui_ready(dsi_display, 1, 0);
 		}
 	}
 #if 0
@@ -1314,7 +1283,6 @@ void sde_connector_helper_bridge_enable(struct drm_connector *connector)
 
 	c_conn = to_sde_connector(connector);
 	display = (struct dsi_display *) c_conn->display;
-
 	/*
 	 * Special handling for some panels which need atleast
 	 * one frame to be transferred to GRAM before enabling backlight.
@@ -2229,8 +2197,8 @@ static ssize_t _sde_debugfs_conn_cmd_tx_sts_read(struct file *file,
 		char __user *buf, size_t count, loff_t *ppos)
 {
 	struct drm_connector *connector = file->private_data;
-	struct sde_connector *c_conn;
-	char buffer[MAX_CMD_PAYLOAD_SIZE];
+	struct sde_connector *c_conn = NULL;
+	char buffer[MAX_CMD_PAYLOAD_SIZE] = {0};
 	int blen = 0;
 
 	if (*ppos)
@@ -2238,7 +2206,7 @@ static ssize_t _sde_debugfs_conn_cmd_tx_sts_read(struct file *file,
 
 	if (!connector) {
 		SDE_ERROR("invalid argument, conn is NULL\n");
-		return 0;
+		return -EINVAL;
 	}
 
 	c_conn = to_sde_connector(connector);
@@ -2252,7 +2220,7 @@ static ssize_t _sde_debugfs_conn_cmd_tx_sts_read(struct file *file,
 	SDE_DEBUG("output: %s\n", buffer);
 	if (blen <= 0) {
 		SDE_ERROR("snprintf failed, blen %d\n", blen);
-		return 0;
+		return -EINVAL;
 	}
 
 	if (blen > count)
@@ -2272,16 +2240,16 @@ static ssize_t _sde_debugfs_conn_cmd_tx_write(struct file *file,
 			const char __user *p, size_t count, loff_t *ppos)
 {
 	struct drm_connector *connector = file->private_data;
-	struct sde_connector *c_conn;
+	struct sde_connector *c_conn = NULL;
 	char *input, *token, *input_copy, *input_dup = NULL;
 	const char *delim = " ";
+	char buffer[MAX_CMD_PAYLOAD_SIZE] = {0};
+	int rc = 0, strtoint = 0;
 	u32 buf_size = 0;
-	char buffer[MAX_CMD_PAYLOAD_SIZE];
-	int rc = 0, strtoint;
 
 	if (*ppos || !connector) {
 		SDE_ERROR("invalid argument(s), conn %d\n", connector != NULL);
-		return 0;
+		return -EINVAL;
 	}
 
 	c_conn = to_sde_connector(connector);
@@ -2289,10 +2257,10 @@ static ssize_t _sde_debugfs_conn_cmd_tx_write(struct file *file,
 	if (!c_conn->ops.cmd_transfer) {
 		SDE_ERROR("no cmd transfer support for connector name %s\n",
 				c_conn->name);
-		return 0;
+		return -EINVAL;
 	}
 
-	input = kmalloc(count + 1, GFP_KERNEL);
+	input = kzalloc(count + 1, GFP_KERNEL);
 	if (!input)
 		return -ENOMEM;
 
@@ -2303,7 +2271,7 @@ static ssize_t _sde_debugfs_conn_cmd_tx_write(struct file *file,
 	}
 	input[count] = '\0';
 
-	SDE_INFO("Command requested for trasnfer to panel: %s\n", input);
+	SDE_INFO("Command requested for transfer to panel: %s\n", input);
 
 	input_copy = kstrdup(input, GFP_KERNEL);
 	if (!input_copy) {
@@ -2317,20 +2285,23 @@ static ssize_t _sde_debugfs_conn_cmd_tx_write(struct file *file,
 		rc = kstrtoint(token, 0, &strtoint);
 		if (rc) {
 			SDE_ERROR("input buffer conversion failed\n");
-			goto end;
+			goto end1;
 		}
 
+		buffer[buf_size++] = (strtoint & 0xff);
 		if (buf_size >= MAX_CMD_PAYLOAD_SIZE) {
 			SDE_ERROR("buffer size exceeding the limit %d\n",
 					MAX_CMD_PAYLOAD_SIZE);
-			goto end;
+			rc = -EFAULT;
+			goto end1;
 		}
-		buffer[buf_size++] = (strtoint & 0xff);
 		token = strsep(&input_copy, delim);
 	}
 	SDE_DEBUG("command packet size in bytes: %u\n", buf_size);
-	if (!buf_size)
-		goto end;
+	if (!buf_size) {
+		rc = -EFAULT;
+		goto end1;
+	}
 
 	mutex_lock(&c_conn->lock);
 	rc = c_conn->ops.cmd_transfer(&c_conn->base, c_conn->display, buffer,
@@ -2339,8 +2310,9 @@ static ssize_t _sde_debugfs_conn_cmd_tx_write(struct file *file,
 	mutex_unlock(&c_conn->lock);
 
 	rc = count;
-end:
+end1:
 	kfree(input_dup);
+end:
 	kfree(input);
 	return rc;
 }
@@ -2349,6 +2321,270 @@ static const struct file_operations conn_cmd_tx_fops = {
 	.open =		_sde_debugfs_conn_cmd_tx_open,
 	.read =		_sde_debugfs_conn_cmd_tx_sts_read,
 	.write =	_sde_debugfs_conn_cmd_tx_write,
+};
+
+static void _sde_connector_report_panel_dead(struct sde_connector *conn, bool skip_pre_kickoff);
+static int _sde_debugfs_conn_esd_test_open(struct inode *inode, struct file *file)
+{
+	/* non-seekable */
+	file->private_data = inode->i_private;
+	return nonseekable_open(inode, file);
+}
+
+
+static ssize_t _sde_debugfs_conn_esd_test_write(struct file *file,
+			const char __user *p, size_t count, loff_t *ppos)
+{
+	struct drm_connector *connector = file->private_data;
+	struct sde_connector *c_conn = to_sde_connector(connector);
+	struct dsi_display *display = c_conn->display;
+	struct drm_event event;
+	int power_mode;
+	char *input;
+	int rc = 0;
+	const char *sde_power_mode_str[] = {
+		[SDE_MODE_DPMS_ON] = "SDE_MODE_DPMS_ON",
+		[SDE_MODE_DPMS_LP1] = "SDE_MODE_DPMS_LP1",
+		[SDE_MODE_DPMS_LP2] = "SDE_MODE_DPMS_LP2",
+		[SDE_MODE_DPMS_STANDBY] = "SDE_MODE_DPMS_STANDBY",
+		[SDE_MODE_DPMS_SUSPEND] = "SDE_MODE_DPMS_SUSPEND",
+		[SDE_MODE_DPMS_OFF] = "SDE_MODE_DPMS_OFF",
+	};
+
+	if (!display || !display->panel) {
+		SDE_ERROR("invalid display/panel\n");
+		return -EINVAL;
+	}
+
+	input = kmalloc(count + 1, GFP_KERNEL);
+	if (!input)
+		return -ENOMEM;
+
+	if (copy_from_user(input, p, count)) {
+		SDE_ERROR("copy from user failed\n");
+		rc = -EFAULT;
+		goto end;
+	}
+	input[count] = '\0';
+	DSI_INFO("[esd-test]intput esd test: %s\n", input);
+
+	if (!strncmp(input, "1", 1) || !strncmp(input, "on", 2) ||
+		!strncmp(input, "true", 4)) {
+		DSI_INFO("[esd-test]panel esd irq trigging \n");
+	} else {
+		goto end;
+	}
+	if (c_conn->connector_type == DRM_MODE_CONNECTOR_DSI) {
+		if (dsi_panel_initialized(display->panel)) {
+			if (atomic_read(&(display->panel->esd_recovery_pending))) {
+				SDE_ERROR("[esd-test]ESD recovery already pending\n");
+				rc = count;
+				goto end;
+			}
+			power_mode = display->panel->power_mode;
+			DSI_INFO("[esd-test]power_mode = %s\n", sde_power_mode_str[power_mode]);
+			if (power_mode == SDE_MODE_DPMS_ON ||
+				power_mode == SDE_MODE_DPMS_LP1) {
+				atomic_set(&display->panel->esd_recovery_pending, 1);
+				_sde_connector_report_panel_dead(c_conn, false);
+			} else {
+				if (!c_conn->panel_dead) {
+					atomic_set(&display->panel->esd_recovery_pending, 1);
+					c_conn->panel_dead = true;
+					event.type = DRM_EVENT_PANEL_DEAD;
+					event.length = sizeof(bool);
+					msm_mode_object_event_notify(&c_conn->base.base,
+						c_conn->base.dev, &event, (u8 *)&c_conn->panel_dead);
+					SDE_EVT32(SDE_EVTLOG_ERROR);
+					SDE_ERROR("[esd-test]esd irq check failed report PANEL_DEAD"
+						" conn_id: %d enc_id: %d\n",
+						c_conn->base.base.id, c_conn->encoder->base.id);
+				}
+			}
+			rc = count;
+		}
+	}
+
+end:
+	kfree(input);
+	return rc;
+}
+
+
+static const struct file_operations conn_esd_test_fops = {
+	.open  = _sde_debugfs_conn_esd_test_open,
+	.write = _sde_debugfs_conn_esd_test_write,
+};
+
+static int _sde_debugfs_conn_cmd_rx_open(struct inode *inode, struct file *file)
+{
+	/* non-seekable */
+	file->private_data = inode->i_private;
+	return nonseekable_open(inode, file);
+}
+
+static ssize_t _sde_debugfs_conn_cmd_rx_read(struct file *file,
+		char __user *buf, size_t count, loff_t *ppos)
+{
+	struct drm_connector *connector = file->private_data;
+	struct sde_connector *c_conn = NULL;
+	char *strs = NULL;
+	char *strs_temp = NULL;
+	int blen = 0, i = 0, n = 0, left_size = 0;
+
+	if (*ppos)
+		return 0;
+
+	if (!connector) {
+		SDE_ERROR("invalid argument, conn is NULL\n");
+		return -EINVAL;
+	}
+
+	c_conn = to_sde_connector(connector);
+	if (c_conn->rx_len <= 0 || c_conn->rx_len > MAX_CMD_RECEIVE_SIZE) {
+		SDE_ERROR("no valid data from panel\n");
+		return -EINVAL;
+	}
+
+	/*
+	 * Rx data was stored as HEX value in rx buffer,
+	 * convert 1 HEX value to strings for display, need 5 bytes.
+	 * for example: HEX value 0xFF, converted to strings, should be '0',
+	 * 'x','F','F' and 1 space.
+	 */
+	left_size = c_conn->rx_len * 5 + 1;
+	strs = kzalloc(left_size, GFP_KERNEL);
+	if (!strs)
+		return -ENOMEM;
+	strs_temp = strs;
+
+	mutex_lock(&c_conn->lock);
+	for (i = 0; i < c_conn->rx_len; i++) {
+		n = scnprintf(strs_temp, left_size, "0x%.2x ",
+			     c_conn->cmd_rx_buf[i]);
+		strs_temp += n;
+		left_size -= n;
+	}
+	mutex_unlock(&c_conn->lock);
+
+	blen = strlen(strs);
+	if (blen <= 0) {
+		SDE_ERROR("snprintf failed, blen %d\n", blen);
+		blen = -EFAULT;
+		goto err;
+	}
+
+	if (copy_to_user(buf, strs, blen)) {
+		SDE_ERROR("copy to user buffer failed\n");
+		blen = -EFAULT;
+		goto err;
+	}
+
+	*ppos += blen;
+
+err:
+	kfree(strs);
+	return blen;
+}
+
+
+static ssize_t _sde_debugfs_conn_cmd_rx_write(struct file *file,
+			const char __user *p, size_t count, loff_t *ppos)
+{
+	struct drm_connector *connector = file->private_data;
+	struct sde_connector *c_conn = NULL;
+	char *input, *token, *input_copy, *input_dup = NULL;
+	const char *delim = " ";
+	unsigned char buffer[MAX_CMD_PAYLOAD_SIZE] = {0};
+	int rc = 0, strtoint = 0;
+	u32 buf_size = 0;
+
+	if (*ppos || !connector) {
+		SDE_ERROR("invalid argument(s), conn %d\n", connector != NULL);
+		return -EINVAL;
+	}
+
+	c_conn = to_sde_connector(connector);
+	if (!c_conn->ops.cmd_receive) {
+		SDE_ERROR("no cmd receive support for connector name %s\n",
+				c_conn->name);
+		return -EINVAL;
+	}
+
+	memset(c_conn->cmd_rx_buf, 0x0, MAX_CMD_RECEIVE_SIZE);
+	c_conn->rx_len = 0;
+
+	input = kzalloc(count + 1, GFP_KERNEL);
+	if (!input)
+		return -ENOMEM;
+
+	if (copy_from_user(input, p, count)) {
+		SDE_ERROR("copy from user failed\n");
+		rc  = -EFAULT;
+		goto end;
+	}
+	input[count] = '\0';
+
+	SDE_INFO("Command requested for rx from panel: %s\n", input);
+
+	input_copy = kstrdup(input, GFP_KERNEL);
+	if (!input_copy) {
+		rc = -ENOMEM;
+		goto end;
+	}
+
+	input_dup = input_copy;
+	token = strsep(&input_copy, delim);
+	while (token) {
+		rc = kstrtoint(token, 0, &strtoint);
+		if (rc) {
+			SDE_ERROR("input buffer conversion failed\n");
+			goto end1;
+		}
+
+		buffer[buf_size++] = (strtoint & 0xff);
+		if (buf_size >= MAX_CMD_PAYLOAD_SIZE) {
+			SDE_ERROR("buffer size = %d exceeding the limit %d\n",
+					buf_size, MAX_CMD_PAYLOAD_SIZE);
+			rc = -EFAULT;
+			goto end1;
+		}
+		token = strsep(&input_copy, delim);
+	}
+
+	if (!buffer[0] || buffer[0] > MAX_CMD_RECEIVE_SIZE) {
+		SDE_ERROR("invalid rx length\n");
+		rc = -EFAULT;
+		goto end1;
+	}
+
+	SDE_DEBUG("command packet size in bytes: %u, rx len: %u\n",
+			buf_size, buffer[0]);
+	if (!buf_size) {
+		rc = -EFAULT;
+		goto end1;
+	}
+
+	mutex_lock(&c_conn->lock);
+	c_conn->rx_len = c_conn->ops.cmd_receive(c_conn->display, buffer + 1,
+			buf_size - 1, c_conn->cmd_rx_buf, buffer[0]);
+	mutex_unlock(&c_conn->lock);
+
+	if (c_conn->rx_len <= 0)
+		rc = -EINVAL;
+	else
+		rc = count;
+end1:
+	kfree(input_dup);
+end:
+	kfree(input);
+	return rc;
+}
+
+static const struct file_operations conn_cmd_rx_fops = {
+	.open =         _sde_debugfs_conn_cmd_rx_open,
+	.read =         _sde_debugfs_conn_cmd_rx_read,
+	.write =        _sde_debugfs_conn_cmd_rx_write,
 };
 
 #ifdef CONFIG_DEBUG_FS
@@ -2387,6 +2623,22 @@ static int sde_connector_init_debugfs(struct drm_connector *connector)
 			connector->debugfs_entry,
 			connector, &conn_cmd_tx_fops)) {
 			SDE_ERROR("failed to create connector cmd_tx\n");
+			return -ENOMEM;
+		}
+	}
+
+	if (!debugfs_create_file("esd_test", 0600,
+		connector->debugfs_entry,
+		connector, &conn_esd_test_fops)) {
+		SDE_ERROR("[esd-test]failed to create connector esd_test\n");
+		return -ENOMEM;
+	}
+
+	if (sde_connector->ops.cmd_receive) {
+		if (!debugfs_create_file("rx_cmd", 0600,
+			connector->debugfs_entry,
+			connector, &conn_cmd_rx_fops)) {
+			SDE_ERROR("failed to create connector cmd_rx\n");
 			return -ENOMEM;
 		}
 	}
@@ -2590,8 +2842,10 @@ static void _sde_connector_report_panel_dead(struct sde_connector *conn,
 	 * 2) Commit thread (if TE stops coming)
 	 * So such case, avoid failure notification twice.
 	 */
-	if (conn->panel_dead)
+	if (conn->panel_dead) {
+		SDE_INFO("panel_dead is true, return!\n");
 		return;
+	}
 
 	conn->panel_dead = true;
 	display->panel->mi_cfg.panel_dead_flag = true;
@@ -2695,6 +2949,14 @@ static irqreturn_t esd_err_irq_handle(int irq, void *data)
 	struct dsi_display *display = c_conn->display;
 	struct drm_event event;
 	int power_mode;
+	const char *sde_power_mode_str[] = {
+		[SDE_MODE_DPMS_ON] = "SDE_MODE_DPMS_ON",
+		[SDE_MODE_DPMS_LP1] = "SDE_MODE_DPMS_LP1",
+		[SDE_MODE_DPMS_LP2] = "SDE_MODE_DPMS_LP2",
+		[SDE_MODE_DPMS_STANDBY] = "SDE_MODE_DPMS_STANDBY",
+		[SDE_MODE_DPMS_SUSPEND] = "SDE_MODE_DPMS_SUSPEND",
+		[SDE_MODE_DPMS_OFF] = "SDE_MODE_DPMS_OFF",
+	};
 
 	if (!display || !display->panel) {
 		SDE_ERROR("invalid display/panel\n");
@@ -2706,6 +2968,8 @@ static irqreturn_t esd_err_irq_handle(int irq, void *data)
 		SDE_ERROR("trigger esd by mistake,return\n");
 		return IRQ_HANDLED;
 	}
+
+	DSI_INFO("panel esd irq trigging \n");
 
 	if (c_conn->connector_type == DRM_MODE_CONNECTOR_DSI) {
 		dsi_panel_acquire_panel_lock(display->panel);
@@ -2735,6 +2999,7 @@ static irqreturn_t esd_err_irq_handle(int irq, void *data)
 		}
 
 		power_mode = display->panel->power_mode;
+		DSI_INFO("power_mode = %s\n", sde_power_mode_str[power_mode]);
 
 		dsi_panel_release_panel_lock(display->panel);
 
@@ -3241,6 +3506,7 @@ struct drm_connector *sde_connector_init(struct drm_device *dev,
 
 	sde_connector_register_esd_irq(c_conn);
 
+
 	return &c_conn->base;
 
 error_destroy_property:
@@ -3343,7 +3609,10 @@ int sde_connector_event_notify(struct drm_connector *connector, uint32_t type,
 int sde_connector_hbm_ctl(struct drm_connector *connector, uint32_t op_code)
 {
 	int ret = 0;
+
+	SDE_ATRACE_BEGIN("sde_connector_hbm_ctl");
 	ret = dsi_display_hbm_set_disp_param(connector, op_code);
+	SDE_ATRACE_END("sde_connector_hbm_ctl");
 	return ret;
 }
 
@@ -3363,6 +3632,9 @@ static uint32_t interpolate(uint32_t x, uint32_t xa, uint32_t xb, uint32_t ya, u
 
 	bf = ya - (ya - yb) * (x - xa) / (xb - xa);
 
+	SDE_DEBUG("backlight brightness:%d, [i-1]bl:%d, [i]bl:%d, [i-1]alpha:%d, [i]alpha:%d, bf:%d",
+			x, xa, xb, ya, yb, bf);
+
 	return bf;
 }
 
@@ -3371,6 +3643,9 @@ static uint32_t brightness_to_alpha(struct dsi_panel_mi_cfg *mi_cfg, uint32_t br
 	int i;
 	int level = mi_cfg->brightnes_alpha_lut_item_count;
 
+	if (!mi_cfg->brightness_alpha_lut)
+		return 0;
+
 	if (brightness == 0x0)
 		return mi_cfg->brightness_alpha_lut[0].alpha;
 
@@ -3378,6 +3653,9 @@ static uint32_t brightness_to_alpha(struct dsi_panel_mi_cfg *mi_cfg, uint32_t br
 		if (mi_cfg->brightness_alpha_lut[i].brightness >= brightness)
 			break;
 	}
+
+	if (i == 0)
+		return mi_cfg->brightness_alpha_lut[i].alpha;
 
 	if (i == level)
 		return mi_cfg->brightness_alpha_lut[i - 1].alpha;

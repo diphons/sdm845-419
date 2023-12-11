@@ -1,4 +1,7 @@
 /*
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ */
+/*
  * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
  * Copyright (C) 2013 Red Hat
  * Author: Rob Clark <robdclark@gmail.com>
@@ -63,10 +66,14 @@
 #define MSM_VERSION_MINOR	3
 #define MSM_VERSION_PATCHLEVEL	0
 
-#define IDLE_ENCODER_MASK_DEFAULT	1
-#define IDLE_TIMEOUT_MS_DEFAULT		100
+static struct kmem_cache *kmem_vblank_work_pool;
 
 static DEFINE_MUTEX(msm_release_lock);
+atomic_t resume_pending;
+wait_queue_head_t resume_wait_q;
+
+#define IDLE_ENCODER_MASK_DEFAULT	1
+#define IDLE_TIMEOUT_MS_DEFAULT		100
 
 static void msm_fb_output_poll_changed(struct drm_device *dev)
 {
@@ -81,6 +88,24 @@ static void msm_fb_output_poll_changed(struct drm_device *dev)
 
 	if (priv->fbdev)
 		drm_fb_helper_hotplug_event(priv->fbdev);
+}
+
+static void msm_drm_display_thread_priority_worker(struct kthread_work *work)
+{
+	int ret = 0;
+	struct sched_param param = { 0 };
+	struct task_struct *task = current->group_leader;
+
+	/**
+	 * this priority was found during empiric testing to have appropriate
+	 * realtime scheduling to process display updates and interact with
+	 * other real time and normal priority task
+	 */
+	param.sched_priority = 16;
+	ret = sched_setscheduler(task, SCHED_FIFO, &param);
+	if (ret)
+		pr_warn("pid:%d name:%s priority update failed: %d\n",
+			current->tgid, task->comm, ret);
 }
 
 /**
@@ -323,7 +348,7 @@ static void vblank_ctrl_worker(struct kthread_work *work)
 	else
 		kms->funcs->disable_vblank(kms, priv->crtcs[cur_work->crtc_id]);
 
-	kfree(cur_work);
+	kmem_cache_free(kmem_vblank_work_pool, cur_work);
 }
 
 static int vblank_ctrl_queue_work(struct msm_drm_private *priv,
@@ -336,7 +361,7 @@ static int vblank_ctrl_queue_work(struct msm_drm_private *priv,
 	if (!priv || crtc_id >= priv->num_crtcs)
 		return -EINVAL;
 
-	cur_work = kzalloc(sizeof(*cur_work), GFP_ATOMIC);
+	cur_work = kmem_cache_zalloc(kmem_vblank_work_pool, GFP_ATOMIC);
 	if (!cur_work)
 		return -ENOMEM;
 
@@ -545,34 +570,24 @@ static int msm_component_bind_all(struct device *dev,
 }
 #endif
 
-static int msm_drm_display_thread_create(struct sched_param param,
-	struct msm_drm_private *priv, struct drm_device *ddev,
+static int msm_drm_display_thread_create(struct msm_drm_private *priv, struct drm_device *ddev,
 	struct device *dev)
 {
 	int i, ret = 0;
 
-	/**
-	 * this priority was found during empiric testing to have appropriate
-	 * realtime scheduling to process display updates and interact with
-	 * other real time and normal priority task
-	 */
-	param.sched_priority = 16;
 	for (i = 0; i < priv->num_crtcs; i++) {
-
 		/* initialize display thread */
 		priv->disp_thread[i].crtc_id = priv->crtcs[i]->base.id;
 		kthread_init_worker(&priv->disp_thread[i].worker);
 		priv->disp_thread[i].dev = ddev;
 		priv->disp_thread[i].thread =
-			kthread_run_perf_critical(cpu_prime_mask,
-				kthread_worker_fn,
+			kthread_run(kthread_worker_fn,
 				&priv->disp_thread[i].worker,
 				"crtc_commit:%d", priv->disp_thread[i].crtc_id);
-		ret = sched_setscheduler(priv->disp_thread[i].thread,
-							SCHED_FIFO, &param);
-		if (ret)
-			pr_warn("display thread priority update failed: %d\n",
-									ret);
+		kthread_init_work(&priv->thread_priority_work,
+				  msm_drm_display_thread_priority_worker);
+		kthread_queue_work(&priv->disp_thread[i].worker, &priv->thread_priority_work);
+		kthread_flush_work(&priv->thread_priority_work);
 
 		if (IS_ERR(priv->disp_thread[i].thread)) {
 			dev_err(dev, "failed to create crtc_commit kthread\n");
@@ -584,8 +599,7 @@ static int msm_drm_display_thread_create(struct sched_param param,
 		kthread_init_worker(&priv->event_thread[i].worker);
 		priv->event_thread[i].dev = ddev;
 		priv->event_thread[i].thread =
-			kthread_run_perf_critical(cpu_prime_mask,
-				kthread_worker_fn,
+			kthread_run(kthread_worker_fn,
 				&priv->event_thread[i].worker,
 				"crtc_event:%d", priv->event_thread[i].crtc_id);
 		/**
@@ -595,11 +609,10 @@ static int msm_drm_display_thread_create(struct sched_param param,
 		 * frame_pending counters beyond 2. This can lead to commit
 		 * failure at crtc commit level.
 		 */
-		ret = sched_setscheduler(priv->event_thread[i].thread,
-							SCHED_FIFO, &param);
-		if (ret)
-			pr_warn("display event thread priority update failed: %d\n",
-									ret);
+		kthread_init_work(&priv->thread_priority_work,
+				  msm_drm_display_thread_priority_worker);
+		kthread_queue_work(&priv->event_thread[i].worker, &priv->thread_priority_work);
+		kthread_flush_work(&priv->thread_priority_work);
 
 		if (IS_ERR(priv->event_thread[i].thread)) {
 			dev_err(dev, "failed to create crtc_event kthread\n");
@@ -632,14 +645,12 @@ static int msm_drm_display_thread_create(struct sched_param param,
 	 * other important events.
 	 */
 	kthread_init_worker(&priv->pp_event_worker);
-	priv->pp_event_thread = kthread_run_perf_critical(cpu_prime_mask,
-			kthread_worker_fn, &priv->pp_event_worker, "pp_event");
+	priv->pp_event_thread = kthread_run(kthread_worker_fn,
+			&priv->pp_event_worker, "pp_event");
 
-	ret = sched_setscheduler(priv->pp_event_thread,
-						SCHED_FIFO, &param);
-	if (ret)
-		pr_warn("pp_event thread priority update failed: %d\n",
-								ret);
+	kthread_init_work(&priv->thread_priority_work, msm_drm_display_thread_priority_worker);
+	kthread_queue_work(&priv->pp_event_worker, &priv->thread_priority_work);
+	kthread_flush_work(&priv->thread_priority_work);
 
 	if (IS_ERR(priv->pp_event_thread)) {
 		dev_err(dev, "failed to create pp_event kthread\n");
@@ -651,6 +662,7 @@ static int msm_drm_display_thread_create(struct sched_param param,
 	return 0;
 
 }
+
 static struct msm_kms *_msm_drm_init_helper(struct msm_drm_private *priv,
 	struct drm_device *ddev, struct device *dev,
 	struct platform_device *pdev)
@@ -702,6 +714,16 @@ static struct msm_kms *_msm_drm_init_helper(struct msm_drm_private *priv,
 	}
 
 	return kms;
+}
+
+static void msm_drm_pm_unreq(struct work_struct *work)
+{
+	struct msm_drm_private *priv = container_of(to_delayed_work(work),
+						    typeof(*priv),
+						    pm_unreq_dwork);
+
+	pm_qos_update_request(&priv->pm_irq_req, PM_QOS_DEFAULT_VALUE);
+	atomic_set_release(&priv->pm_req_set, 0);
 }
 
 static ssize_t idle_encoder_mask_store(struct device *device,
@@ -858,16 +880,6 @@ static void msm_idle_init(struct drm_device *ddev)
 	spin_lock_init(&idle->lock);
 }
 
-static void msm_drm_pm_unreq(struct work_struct *work)
-{
-	struct msm_drm_private *priv = container_of(to_delayed_work(work),
-						    typeof(*priv),
-						    pm_unreq_dwork);
-
-	pm_qos_update_request(&priv->pm_irq_req, PM_QOS_DEFAULT_VALUE);
-	atomic_set_release(&priv->pm_req_set, 0);
-}
-
 static int msm_drm_init(struct device *dev, struct drm_driver *drv)
 {
 	struct platform_device *pdev = to_platform_device(dev);
@@ -875,7 +887,6 @@ static int msm_drm_init(struct device *dev, struct drm_driver *drv)
 	struct msm_drm_private *priv;
 	struct msm_kms *kms = NULL;
 	int ret;
-	struct sched_param param = { 0 };
 	struct drm_crtc *crtc;
 
 	ddev = drm_dev_alloc(drv, dev);
@@ -915,11 +926,13 @@ static int msm_drm_init(struct device *dev, struct drm_driver *drv)
 		goto power_init_fail;
 	}
 
+#ifdef CONFIG_DEBUG_FS
 	ret = sde_dbg_init(&pdev->dev);
 	if (ret) {
 		dev_err(dev, "failed to init sde dbg: %d\n", ret);
 		goto dbg_init_fail;
 	}
+#endif
 
 	msm_idle_init(ddev);
 
@@ -941,7 +954,7 @@ static int msm_drm_init(struct device *dev, struct drm_driver *drv)
 		goto fail;
 	}
 
-	ret = msm_drm_display_thread_create(param, priv, ddev, dev);
+	ret = msm_drm_display_thread_create(priv, ddev, dev);
 	if (ret) {
 		dev_err(dev, "msm_drm_display_thread_create failed\n");
 		goto fail;
@@ -966,12 +979,12 @@ static int msm_drm_init(struct device *dev, struct drm_driver *drv)
 		}
 	}
 
-	drm_mode_config_reset(ddev);
-
 	ret = drm_dev_register(ddev, 0);
 	if (ret)
 		goto fail;
 	priv->registered = true;
+
+	drm_mode_config_reset(ddev);
 
 	if (kms && kms->funcs && kms->funcs->cont_splash_config) {
 		ret = kms->funcs->cont_splash_config(kms);
@@ -986,11 +999,13 @@ static int msm_drm_init(struct device *dev, struct drm_driver *drv)
 		priv->fbdev = msm_fbdev_init(ddev);
 #endif
 
+#ifdef CONFIG_DEBUG_FS
 	ret = sde_dbg_debugfs_register(dev);
 	if (ret) {
 		dev_err(dev, "failed to reg sde dbg debugfs: %d\n", ret);
 		goto fail;
 	}
+#endif
 
 	/* perform subdriver post initialization */
 	if (kms && kms->funcs && kms->funcs->postinit) {
@@ -1010,14 +1025,17 @@ fail:
 	return ret;
 bind_fail:
 	sde_dbg_destroy();
+#ifdef CONFIG_DEBUG_FS
 dbg_init_fail:
 	sde_power_resource_deinit(pdev, &priv->phandle);
+#endif
 power_init_fail:
 	msm_mdss_destroy(ddev);
 mdss_init_fail:
 	kfree(priv);
 priv_alloc_fail:
 	drm_dev_put(ddev);
+	platform_set_drvdata(pdev, NULL);
 	return ret;
 }
 
@@ -1902,6 +1920,19 @@ static struct drm_driver msm_driver = {
 };
 
 #ifdef CONFIG_PM_SLEEP
+static int msm_pm_prepare(struct device *dev)
+{
+	atomic_inc(&resume_pending);
+	return 0;
+}
+
+static void msm_pm_complete(struct device *dev)
+{
+	atomic_set(&resume_pending, 0);
+	wake_up_all(&resume_wait_q);
+	return;
+}
+
 static int msm_pm_suspend(struct device *dev)
 {
 	struct drm_device *ddev;
@@ -1987,6 +2018,8 @@ static int msm_runtime_resume(struct device *dev)
 #endif
 
 static const struct dev_pm_ops msm_pm_ops = {
+	.prepare = msm_pm_prepare,
+	.complete = msm_pm_complete,
 	SET_SYSTEM_SLEEP_PM_OPS(msm_pm_suspend, msm_pm_resume)
 	SET_RUNTIME_PM_OPS(msm_runtime_suspend, msm_runtime_resume, NULL)
 };
@@ -2268,6 +2301,7 @@ static struct platform_driver msm_platform_driver = {
 		.of_match_table = dt_match,
 		.pm     = &msm_pm_ops,
 		.suppress_bind_attrs = true,
+		.probe_type = PROBE_PREFER_ASYNCHRONOUS,
 	},
 };
 
@@ -2277,6 +2311,7 @@ static int __init msm_drm_register(void)
 		return -EINVAL;
 
 	DBG("init");
+	kmem_vblank_work_pool = KMEM_CACHE(vblank_work, SLAB_HWCACHE_ALIGN | SLAB_PANIC);
 	msm_smmu_driver_init();
 	msm_dsi_register();
 	msm_edp_register();

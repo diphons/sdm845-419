@@ -5,6 +5,7 @@
 
 #include "kgsl_device.h"
 #include "kgsl_sync.h"
+#include "adreno.h"
 
 static const struct kgsl_ioctl kgsl_ioctl_funcs[] = {
 	KGSL_IOCTL_FUNC(IOCTL_KGSL_DEVICE_GETPROPERTY,
@@ -84,20 +85,6 @@ static const struct kgsl_ioctl kgsl_ioctl_funcs[] = {
 			kgsl_ioctl_sparse_bind),
 	KGSL_IOCTL_FUNC(IOCTL_KGSL_GPU_SPARSE_COMMAND,
 			kgsl_ioctl_gpu_sparse_command),
-	KGSL_IOCTL_FUNC(IOCTL_KGSL_GPU_AUX_COMMAND,
-			kgsl_ioctl_gpu_aux_command),
-	KGSL_IOCTL_FUNC(IOCTL_KGSL_TIMELINE_CREATE,
-			kgsl_ioctl_timeline_create),
-	KGSL_IOCTL_FUNC(IOCTL_KGSL_TIMELINE_WAIT,
-			kgsl_ioctl_timeline_wait),
-	KGSL_IOCTL_FUNC(IOCTL_KGSL_TIMELINE_FENCE_GET,
-			kgsl_ioctl_timeline_fence_get),
-	KGSL_IOCTL_FUNC(IOCTL_KGSL_TIMELINE_QUERY,
-			kgsl_ioctl_timeline_query),
-	KGSL_IOCTL_FUNC(IOCTL_KGSL_TIMELINE_SIGNAL,
-			kgsl_ioctl_timeline_signal),
-	KGSL_IOCTL_FUNC(IOCTL_KGSL_TIMELINE_DESTROY,
-			kgsl_ioctl_timeline_destroy),
 };
 
 long kgsl_ioctl_copy_in(unsigned int kernel_cmd, unsigned int user_cmd,
@@ -167,7 +154,12 @@ static long __kgsl_ioctl(struct file *filep, unsigned int cmd,
 {
 	struct kgsl_device_private *dev_priv = filep->private_data;
 	struct kgsl_device *device = dev_priv->device;
+	struct adreno_device *adreno_dev = ADRENO_DEVICE(device);
 	long ret;
+
+	if (cmd == IOCTL_KGSL_GPU_COMMAND &&
+	    READ_ONCE(device->state) != KGSL_STATE_ACTIVE)
+		kgsl_schedule_work(&adreno_dev->pwr_on_work);
 
 	ret = kgsl_ioctl_helper(filep, cmd, arg, kgsl_ioctl_funcs,
 		ARRAY_SIZE(kgsl_ioctl_funcs));

@@ -263,11 +263,6 @@ struct sde_rot_data_type {
 
 	u32 vbif_xin_id[MAX_XIN];
 
-	struct pm_qos_request pm_qos_rot_cpu_req;
-	u32 rot_pm_qos_cpu_count;
-	u32 rot_pm_qos_cpu_mask;
-	u32 rot_pm_qos_cpu_dma_latency;
-
 	u32 vbif_memtype_count;
 	u32 *vbif_memtype;
 

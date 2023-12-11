@@ -1,7 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2010-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 #ifndef __KGSL_PWRCTRL_H
 #define __KGSL_PWRCTRL_H
@@ -127,7 +126,6 @@ struct gpu_cx_ipeak_client {
  * @previous_pwrlevel - The power level before transition
  * @thermal_pwrlevel - maximum powerlevel constraint from thermal
  * @thermal_pwrlevel_floor - minimum powerlevel constraint from thermal
- * @default_pwrlevel - device wake up power level
  * @max_pwrlevel - maximum allowable powerlevel per the user
  * @min_pwrlevel - minimum allowable powerlevel per the user
  * @num_pwrlevels - number of available power levels
@@ -163,7 +161,6 @@ struct gpu_cx_ipeak_client {
  * @limits_lock - spin lock to protect limits list
  * @sysfs_pwr_limit - pointer to the sysfs limits node
  * @cx_ipeak_pwr_limit - pointer to the cx_ipeak limits node
- * @cooling_pwr_limit - pointer to the cooling framework limits node
  * isense_clk_indx - index of isense clock, 0 if no isense
  * isense_clk_on_level - isense clock rate is XO rate below this level.
  * gpu_cx_ipeak_client - CX Ipeak clients used by GPU
@@ -183,7 +180,6 @@ struct kgsl_pwrctrl {
 	unsigned int previous_pwrlevel;
 	unsigned int thermal_pwrlevel;
 	unsigned int thermal_pwrlevel_floor;
-	unsigned int default_pwrlevel;
 	unsigned int wakeup_maxpwrlevel;
 	unsigned int max_pwrlevel;
 	unsigned int min_pwrlevel;
@@ -220,7 +216,6 @@ struct kgsl_pwrctrl {
 	spinlock_t limits_lock;
 	struct kgsl_pwr_limit *sysfs_pwr_limit;
 	struct kgsl_pwr_limit *cx_ipeak_pwr_limit;
-	struct kgsl_pwr_limit *cooling_pwr_limit;
 	unsigned int gpu_bimc_int_clk_freq;
 	bool gpu_bimc_interface_enabled;
 	struct gpu_cx_ipeak_client gpu_ipeak_client[2];

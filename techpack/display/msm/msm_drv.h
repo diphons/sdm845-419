@@ -74,6 +74,9 @@ struct msm_gem_vma;
 
 #define TEARDOWN_DEADLOCK_RETRY_MAX 5
 
+extern atomic_t resume_pending;
+extern wait_queue_head_t resume_wait_q;
+
 struct msm_file_private {
 	rwlock_t queuelock;
 	struct list_head submitqueues;
@@ -167,7 +170,7 @@ enum msm_mdp_crtc_property {
 	CRTC_PROP_CAPTURE_OUTPUT,
 
 	CRTC_PROP_IDLE_PC_STATE,
-	CRTC_PROP_MI_FOD_SYNC_INFO,
+	CRCT_PROP_MI_FOD_SYNC_INFO,
 
 	/* total # of properties */
 	CRTC_PROP_COUNT
@@ -664,6 +667,8 @@ struct msm_drm_private {
 	struct task_struct *pp_event_thread;
 	struct kthread_worker pp_event_worker;
 
+	struct kthread_work thread_priority_work;
+
 	unsigned int num_encoders;
 	struct drm_encoder *encoders[MAX_ENCODERS];
 
@@ -714,12 +719,13 @@ struct msm_drm_private {
 
 	/* update the flag when msm driver receives shutdown notification */
 	bool shutdown_in_progress;
-
-	struct msm_idle idle;
+	ktime_t  complete_commit_time;
 
 	struct pm_qos_request pm_irq_req;
 	struct delayed_work pm_unreq_dwork;
 	atomic_t pm_req_set;
+
+	struct msm_idle idle;
 };
 
 /* get struct msm_kms * from drm_device * */

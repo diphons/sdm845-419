@@ -1,10 +1,13 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2017-2020, The Linux Foundation. All rights reserved.
  * Copyright (c) 2018, Pal Zoltan Illes (tbalden) - kcal rgb
  */
 #include <linux/moduleparam.h>
 #include <drm/msm_drm_pp.h>
+#ifdef CONFIG_D8G_SERVICE
+#include <misc/d8g_helper.h>
+#endif
 #include "sde_hw_color_proc_common_v4.h"
 #include "sde_hw_color_proc_v4.h"
 
@@ -236,6 +239,18 @@ void sde_setup_dspp_pccv4(struct sde_hw_dspp *ctx, void *cfg)
 		kcal_green = kcal_min;
 	if (kcal_blue < kcal_min)
 		kcal_blue = kcal_min;
+
+#ifdef CONFIG_D8G_SERVICE
+	if (limited) {
+		kcal_red = 256;
+		kcal_green = 256;
+		kcal_blue = 256;
+		kcal_hue = 0;
+		kcal_sat = 255;
+		kcal_val = 255;
+		kcal_cont = 255;
+	}
+#endif
 
 	if (!hw_cfg->payload) {
 		DRM_DEBUG_DRIVER("disable pcc feature\n");
