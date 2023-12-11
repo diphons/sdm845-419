@@ -147,6 +147,7 @@ struct msm_vidc_input_crop_payload {
 };
 #endif
 
+#ifdef CONFIG_ARCH_SDM845
 #ifdef VENUS_USES_LEGACY_MISR_INFO
 struct msm_vidc_misr_info {
 	unsigned int misr_dpb_luma;
@@ -156,19 +157,20 @@ struct msm_vidc_misr_info {
 };
 #else
 struct msm_vidc_misr_info {
-#ifdef CONFIG_ARCH_SDM845
 	unsigned int misr_set;
 	unsigned int misr_dpb_luma[8];
 	unsigned int misr_dpb_chroma[8];
 	unsigned int misr_opb_luma[8];
 	unsigned int misr_opb_chroma[8];
+};
+#endif
 #else
+struct msm_vidc_misr_info {
 	__u32 misr_set;
 	__u32 misr_dpb_luma[8];
 	__u32 misr_dpb_chroma[8];
 	__u32 misr_opb_luma[8];
 	__u32 misr_opb_chroma[8];
-#endif
 };
 #endif
 
