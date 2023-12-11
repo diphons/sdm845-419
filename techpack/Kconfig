@@ -4,6 +4,12 @@ source "techpack/data/Kconfig"
 source "techpack/mi845/Kconfig"
 source "techpack/wlan/Kconfig"
 
+config OSSFOD
+	bool "OSS FOD support"
+	depends on MACH_XIAOMI
+	help
+	  When this option is enabled, OSS FOD support will be added.
+
 menu "Camera packages"
 
 config TECHPACK_CAMERA_XIAOMI
