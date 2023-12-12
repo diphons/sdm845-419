@@ -4727,8 +4727,6 @@ int dsi_panel_set_lp1(struct dsi_panel *panel)
 		DSI_ERR("[%s] failed to send DSI_CMD_SET_LP1 cmd, rc=%d\n",
 		       panel->name, rc);
 
-
-
 exit:
 	//for l3a && j11
 	if (panel->mi_cfg.panel_id == 0x4C334100420200 || panel->mi_cfg.panel_id == 0x4A323200380801)
@@ -4764,8 +4762,6 @@ int dsi_panel_set_lp2(struct dsi_panel *panel)
 	if (rc)
 		DSI_ERR("[%s] failed to send DSI_CMD_SET_LP2 cmd, rc=%d\n",
 		       panel->name, rc);
-
-
 
 exit:
 	mutex_unlock(&panel->panel_lock);
@@ -4835,9 +4831,6 @@ exit_skip:
 	mi_cfg->sysfs_fod_unlock_success = false;
 	mi_cfg->fod_to_nolp = false;
 	fm_stat.idle_status = false;
-
-
-
 
 #ifdef CONFIG_D8G_SERVICE
 	oplus_panel_status = 2; // DISPLAY_POWER_ON
@@ -5267,8 +5260,6 @@ int dsi_panel_enable(struct dsi_panel *panel)
 	mi_cfg->into_aod_pending = false;
 	mi_cfg->cabc_current_status = 0;
 	fm_stat.idle_status = false;
-
-
 
 #ifdef CONFIG_D8G_SERVICE
 	oplus_panel_status = 2; // DISPLAY_POWER_ON
