@@ -42,7 +42,6 @@
 #define MIN_PREFILL_LINES      35
 
 extern void sde_crtc_fod_ui_ready(struct dsi_display *display, int type, int value);
-static struct dsi_panel *g_panel;
 
 enum dsi_dsc_ratio_type {
 	DSC_8BPC_8BPP,
