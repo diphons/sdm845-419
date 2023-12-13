@@ -157,7 +157,7 @@ config PSTORE_RAM
 config PSTORE_LAST_KMSG
 	bool "export /proc/last_kmsg"
 	default y if BOARD_XIAOMI
-	depends on PSTORE
+	depends on PSTORE && ARCH_KONA
 	help
 	  When the option is enabled, pstore will export a proc filesystem
 	  interface /proc/last_kmsg.
