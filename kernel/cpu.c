@@ -2448,20 +2448,42 @@ EXPORT_SYMBOL(__cpu_isolated_mask);
 #define LITTLE_CPU_MASK ((1UL << (NR_CPUS / 2)) - 1)
 #define BIG_CPU_MASK    (((1UL << NR_CPUS) - 1) & ~LITTLE_CPU_MASK)
 #ifdef CONFIG_LITTLE_CPU_MASK
-static const unsigned long little_cluster_cpus = CONFIG_LITTLE_CPU_MASK;
+static const unsigned long lp_cpu_bits = CONFIG_LITTLE_CPU_MASK;
+const struct cpumask *const cpu_lp_mask = to_cpumask(&lp_cpu_bits);
 #else
-static const unsigned long little_cluster_cpus = LITTLE_CPU_MASK;
+#ifdef CONFIG_ARCH_SDM845
+static const unsigned long lp_cpu_bits = LITTLE_CPU_MASK;
+const struct cpumask *const cpu_lp_mask = to_cpumask(&lp_cpu_bits);
+#else
+const struct cpumask *const cpu_lp_mask = cpu_possible_mask;
 #endif
-const struct cpumask *const cpu_lp_mask = to_cpumask(&little_cluster_cpus);
+#endif
 EXPORT_SYMBOL(cpu_lp_mask);
 
-#if CONFIG_BIG_CPU_MASK
-static const unsigned long big_cluster_cpus = CONFIG_BIG_CPU_MASK;
+#ifdef CONFIG_BIG_CPU_MASK
+static const unsigned long perf_cpu_bits = CONFIG_BIG_CPU_MASK;
+const struct cpumask *const cpu_perf_mask = to_cpumask(&perf_cpu_bits);
 #else
-static const unsigned long big_cluster_cpus = BIG_CPU_MASK;
+#ifdef CONFIG_ARCH_SDM845
+static const unsigned long perf_cpu_bits = BIG_CPU_MASK;
+const struct cpumask *const cpu_perf_mask = to_cpumask(&perf_cpu_bits);
+#else
+const struct cpumask *const cpu_perf_mask = cpu_possible_mask;
 #endif
-const struct cpumask *const cpu_perf_mask = to_cpumask(&big_cluster_cpus);
+#endif
 EXPORT_SYMBOL(cpu_perf_mask);
+
+#ifdef CONFIG_PRIME_CPU_MASK
+static const unsigned long prime_cpu_bits = CONFIG_PRIME_CPU_MASK;
+const struct cpumask *const cpu_prime_mask = to_cpumask(&prime_cpu_bits);
+#else
+#ifdef CONFIG_ARCH_SDM845
+const struct cpumask *const cpu_prime_mask = cpu_perf_mask;
+#else
+const struct cpumask *const cpu_prime_mask = cpu_possible_mask;
+#endif
+#endif
+EXPORT_SYMBOL(cpu_prime_mask);
 
 void init_cpu_present(const struct cpumask *src)
 {
