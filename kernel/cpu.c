@@ -2476,14 +2476,8 @@ EXPORT_SYMBOL(cpu_perf_mask);
 #ifdef CONFIG_PRIME_CPU_MASK
 static const unsigned long prime_cpu_bits = CONFIG_PRIME_CPU_MASK;
 const struct cpumask *const cpu_prime_mask = to_cpumask(&prime_cpu_bits);
-#else
-#ifdef CONFIG_ARCH_SDM845
-const struct cpumask *const cpu_prime_mask = cpu_perf_mask;
-#else
-const struct cpumask *const cpu_prime_mask = cpu_possible_mask;
-#endif
-#endif
 EXPORT_SYMBOL(cpu_prime_mask);
+#endif
 
 void init_cpu_present(const struct cpumask *src)
 {
