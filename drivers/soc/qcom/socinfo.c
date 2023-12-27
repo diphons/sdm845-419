@@ -106,21 +106,13 @@ const char *hw_platform[] = {
 	[HW_PLATFORM_K81A] = "ELISH",
 	[HW_PLATFORM_L3A] = "PSYCHE",
 	[HW_PLATFORM_L11R] = "MUNCH",
-<<<<<<< HEAD
 	[HW_PLATFORM_L81A] = "DAGU",
-=======
 	[HW_PLATFORM_D5X] = "POLARIS",
 	[HW_PLATFORM_E1N] = "DIPPER",
 	[HW_PLATFORM_E10] = "BERYLLIUM",
 	[HW_PLATFORM_E1S] = "EQUULEUS",
 	[HW_PLATFORM_E8] = "URSA",
 	[HW_PLATFORM_E5] = "PERSEUS",
-#ifdef CONFIG_BOARD_XIAOMI_SM7250
-	[HW_PLATFORM_J9A] = "VANGOGH",
-	[HW_PLATFORM_G7A] = "PICASSO",
-	[HW_PLATFORM_J9]  = "MONET",
-#endif
->>>>>>> a88bd60d22c0 (drivers: soc: Import xiaomi hardware id * From dipper-q-oss)
 	[HW_PLATFORM_HDK] = "HDK",
 	[HW_PLATFORM_IDP] = "IDP"
 };
