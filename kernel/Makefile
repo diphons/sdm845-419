@@ -128,7 +128,13 @@ obj-$(CONFIG_RSEQ) += rseq.o
 $(obj)/configs.o: $(obj)/config_data.h
 
 targets += config_data.gz
+ifeq ($(CONFIG_ARCH_SDM845),y)
 $(obj)/config_data.gz: arch/arm64/configs/stock_defconfig FORCE
+else ifeq ($(CONFIG_ARCH_KONA),y)
+$(obj)/config_data.gz: arch/arm64/configs/kona-stock_defconfig FORCE
+else
+$(obj)/config_data.gz: $(KCONFIG_CONFIG) FORCE
+endif
 	$(call if_changed,gzip)
 
       filechk_ikconfiggz = (echo "static const char kernel_config_data[] __used = MAGIC_START"; cat $< | scripts/bin2c; echo "MAGIC_END;")
