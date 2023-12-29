@@ -5,9 +5,9 @@ IO_MODULE := msm
 
 # Need to add include paths:
 LINUXINCLUDE += \
-             -I$(srctree)techpack/audio/include/dsp \
-             -I$(srctree)techpack/audio/include/uapi \
-             -I$(srctree)techpack/audio/include
+             -I$(srctree)techpack/audio_sdm845/include/dsp \
+             -I$(srctree)techpack/audio_sdm845/include/uapi \
+             -I$(srctree)techpack/audio_sdm845/include
 
 obj-y += mius.o
 obj-y += mius_mixer_controls.o
