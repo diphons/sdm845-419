@@ -805,8 +805,13 @@ static int spss_parse_dt(struct device_node *node)
 	ret = of_property_read_u32(node, "qcom,spss-emul-type-reg-addr",
 			     &spss_emul_type_reg_addr);
 	if (ret < 0) {
+#ifdef CONFIG_ARCH_SDM845
 		pr_warn("can't get spss-emulation-type-reg addr\n");
 		goto end;
+#else
+		pr_err("can't get spss-emulation-type-reg addr\n");
+		return -EINVAL;
+#endif
 	}
 
 	spss_emul_type_reg = ioremap_nocache(spss_emul_type_reg_addr,
@@ -825,7 +830,9 @@ static int spss_parse_dt(struct device_node *node)
 		firmware_type = SPSS_FW_TYPE_NONE;
 	}
 	iounmap(spss_emul_type_reg);
+#ifdef CONFIG_ARCH_SDM845
 end:
+#endif
 
 	/* PIL-SPSS area */
 	np = of_parse_phandle(node, "pil-mem", 0);
