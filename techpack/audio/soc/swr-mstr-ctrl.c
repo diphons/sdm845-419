@@ -856,6 +856,7 @@ retry_read:
 			/* wait 500 us before retry on fifo read failure */
 			usleep_range(500, 505);
 			if (retry_attempt == (MAX_FIFO_RD_FAIL_RETRY - 1)) {
+				swr_master_write(swrm, SWRM_CMD_FIFO_CMD, 0x1);
 				swr_master_write(swrm, SWRM_CMD_FIFO_RD_CMD, val);
 			}
 			retry_attempt++;

@@ -1,7 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /* Copyright (c) 2012-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2023, Qualcomm Innovation Center, Inc. All rights reserved.
- * Copyright (C) 2019 XiaoMi, Inc.
  */
 #include <linux/slab.h>
 #include <linux/debugfs.h>
@@ -6007,7 +6005,7 @@ static int __afe_port_start(u16 port_id, union afe_port_config *afe_config,
 		goto fail_cmd;
 	}
 	ret = afe_send_cmd_port_start(port_id);
-#ifdef CONFIG_MSM_CSPL
+#if CONFIG_MSM_CSPL
 	if (ret == 0)
 		crus_afe_port_start(port_id);
 #endif
@@ -8529,7 +8527,6 @@ int afe_validate_port(u16 port_id)
 	case SLIMBUS_2_RX:
 	case SLIMBUS_2_TX:
 	case SLIMBUS_3_RX:
-	case SLIMBUS_3_TX:
 	case INT_BT_SCO_RX:
 	case INT_BT_SCO_TX:
 	case INT_BT_A2DP_RX:
@@ -8897,7 +8894,7 @@ int afe_close(int port_id)
 	if (ret)
 		pr_err("%s: AFE close failed %d\n", __func__, ret);
 
-#ifdef CONFIG_MSM_CSPL
+#if CONFIG_MSM_CSPL
     crus_afe_port_close(port_id);
 #endif
 
