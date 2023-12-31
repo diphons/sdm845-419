@@ -1,6 +1,5 @@
 # SPDX-License-Identifier: GPL-2.0-only
 
-ifdef CONFIG_TECHPACK_CAMERA_XIAOMI
 # auto-detect subdirs
 ifeq ($(CONFIG_ARCH_KONA), y)
 include $(srctree)/techpack/camera-xiaomi/config/konacamera.conf
@@ -29,6 +28,7 @@ LINUXINCLUDE    += \
 		-include $(srctree)/techpack/camera-xiaomi/config/bengalcameraconf.h
 endif
 
+ifndef CONFIG_ARCH_SDM845
 ifdef CONFIG_SPECTRA_CAMERA
 # Use USERINCLUDE when you must reference the UAPI directories only.
 USERINCLUDE     += \
