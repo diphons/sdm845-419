@@ -444,6 +444,11 @@ config BOARD_XIAOMI
 	  This enables support for XiaoMi Family devices.
 
 if BOARD_XIAOMI
+config BOARD_XIAOMI_SDM845
+	bool "Xiaomi SDM845 Board"
+	select ARCH_QCOM
+	select ARCH_SDM845
+
 config BOARD_XIAOMI_SM8250
 	bool
 	select ARCH_QCOM
@@ -483,6 +488,12 @@ config BOARD_DRACO
 	select BOARD_XIAOMI_SM8250
 	help
 	  This enables support for Xiaomi MI MIX Alpha 2
+
+config BOARD_E10
+	bool "Elish platform"
+	select BOARD_XIAOMI_SDM845
+	help
+	  This enables support for Xiaomi Poco F1.
 
 config BOARD_ELISH
 	bool "Elish platform"
