@@ -28,6 +28,7 @@ LINUXINCLUDE    += \
 		-include $(srctree)/techpack/camera/config/bengalcameraconf.h
 endif
 
+ifdef CONFIG_ARCH_KONA
 ifdef CONFIG_SPECTRA_CAMERA
 # Use USERINCLUDE when you must reference the UAPI directories only.
 USERINCLUDE     += \
@@ -42,3 +43,5 @@ obj-y += drivers/
 else
 $(info Target not found)
 endif
+endif
+ifdef CONFIG_ARCH_KONA
