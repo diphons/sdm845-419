@@ -138,6 +138,8 @@ else ifeq ($(CONFIG_BOARD_CMI),y)
 $(obj)/config_data.gz: arch/arm64/configs/vendor/xiaomi/stock/cmi-stock_defconfig FORCE
 else ifeq ($(CONFIG_BOARD_DAGU),y)
 $(obj)/config_data.gz: arch/arm64/configs/vendor/xiaomi/stock/dagu-stock_defconfig FORCE
+else ifeq ($(CONFIG_BOARD_E10),y)
+$(obj)/config_data.gz: arch/arm64/configs/vendor/xiaomi/stock/sdm845-stock_defconfig FORCE
 else ifeq ($(CONFIG_BOARD_ELISH),y)
 $(obj)/config_data.gz: arch/arm64/configs/vendor/xiaomi/stock/elish-stock_defconfig FORCE
 else ifeq ($(CONFIG_BOARD_ENUMA),y)
