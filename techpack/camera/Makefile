@@ -44,4 +44,3 @@ else
 $(info Target not found)
 endif
 endif
-ifdef CONFIG_ARCH_KONA
