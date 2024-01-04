@@ -83,13 +83,11 @@ uint32_t register_system_pm_ops(struct system_pm_ops *pm_ops)
 	return 0;
 }
 
-#ifdef CONFIG_MIHW
 void lpm_disable_for_dev(bool on, char event_dev)
 {
 	// Do nothing
 }
 EXPORT_SYMBOL(lpm_disable_for_dev);
-#endif
 
 static int lpm_dying_cpu(unsigned int cpu)
 {
