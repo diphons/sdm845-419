@@ -422,16 +422,11 @@ static int tcs_write(struct rsc_drv *drv, const struct tcs_request *msg)
 	if (IS_ERR(tcs))
 		return PTR_ERR(tcs);
 
-<<<<<<< HEAD
-	rpmh_spin_lock(&drv->lock);
-
-=======
 	spin_lock_irqsave(&tcs->lock, flags);
-	spin_lock(&drv->lock);
->>>>>>> e9a5c6dc910f (qcom/soc and kernel/power commits)
+	rpmh_spin_lock(&drv->lock);
 	if (msg->state == RPMH_ACTIVE_ONLY_STATE && drv->in_solver_mode) {
 		ret = -EINVAL;
-		spin_unlock(&drv->lock);
+		rpmh_spin_unlock(&drv->lock);
 		goto done_write;
 	}
 	/*
@@ -440,14 +435,14 @@ static int tcs_write(struct rsc_drv *drv, const struct tcs_request *msg)
 	 */
 	ret = check_for_req_inflight(drv, tcs, msg);
 	if (ret) {
-		spin_unlock(&drv->lock);
+		rpmh_spin_unlock(&drv->lock);
 		goto done_write;
 	}
 
 	tcs_id = find_free_tcs(tcs);
 	if (tcs_id < 0) {
 		ret = tcs_id;
-		spin_unlock(&drv->lock);
+		rpmh_spin_unlock(&drv->lock);
 		goto done_write;
 	}
 
@@ -456,17 +451,13 @@ static int tcs_write(struct rsc_drv *drv, const struct tcs_request *msg)
 
 	if (msg->state == RPMH_ACTIVE_ONLY_STATE && tcs->type != ACTIVE_TCS)
 		enable_tcs_irq(drv, tcs_id, true);
-	spin_unlock(&drv->lock);
+	rpmh_spin_unlock(&drv->lock);
 
 	__tcs_buffer_write(drv, tcs_id, 0, msg);
 	__tcs_trigger(drv, tcs_id, true);
 
 done_write:
-<<<<<<< HEAD
-	rpmh_spin_unlock(&drv->lock);
-=======
 	spin_unlock_irqrestore(&tcs->lock, flags);
->>>>>>> e9a5c6dc910f (qcom/soc and kernel/power commits)
 	return ret;
 }
 
@@ -587,20 +578,12 @@ static int tcs_ctrl_write(struct rsc_drv *drv, const struct tcs_request *msg)
 	if (IS_ERR(tcs))
 		return PTR_ERR(tcs);
 
-<<<<<<< HEAD
-	rpmh_spin_lock(&drv->lock);
-=======
 	spin_lock_irqsave(&tcs->lock, flags);
->>>>>>> e9a5c6dc910f (qcom/soc and kernel/power commits)
 	/* find the TCS id and the command in the TCS to write to */
 	ret = find_slots(tcs, msg, &tcs_id, &cmd_id);
 	if (!ret)
 		__tcs_buffer_write(drv, tcs_id, cmd_id, msg);
-<<<<<<< HEAD
-	rpmh_spin_unlock(&drv->lock);
-=======
 	spin_unlock_irqrestore(&tcs->lock, flags);
->>>>>>> e9a5c6dc910f (qcom/soc and kernel/power commits)
 
 	return ret;
 }
