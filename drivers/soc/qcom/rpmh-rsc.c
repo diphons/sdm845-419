@@ -9,9 +9,9 @@
 #include <linux/delay.h>
 #include <linux/interrupt.h>
 #include <linux/io.h>
-#include <linux/ipc_logging.h>
 #include <linux/kernel.h>
 #include <linux/list.h>
+#include <linux/module.h>
 #include <linux/of.h>
 #include <linux/of_irq.h>
 #include <linux/of_platform.h>
@@ -29,6 +29,7 @@
 #define CREATE_TRACE_POINTS
 #include "trace-rpmh.h"
 
+#include <linux/ipc_logging.h>
 #define RSC_DRV_IPC_LOG_SIZE		2
 
 #define RSC_DRV_TCS_OFFSET		672
@@ -936,6 +937,7 @@ static const struct of_device_id rpmh_drv_match[] = {
 	{ .compatible = "qcom,rpmh-rsc", },
 	{ }
 };
+MODULE_DEVICE_TABLE(of, rpmh_drv_match);
 
 static struct platform_driver rpmh_driver = {
 	.probe = rpmh_rsc_probe,
@@ -952,5 +954,5 @@ static int __init rpmh_driver_init(void)
 }
 arch_initcall(rpmh_driver_init);
 
+MODULE_DESCRIPTION("Qualcomm Technologies, Inc. RPMh Driver");
 MODULE_LICENSE("GPL v2");
-MODULE_DESCRIPTION("Qualcomm RPM-Hardened (RPMH) Communication driver");
