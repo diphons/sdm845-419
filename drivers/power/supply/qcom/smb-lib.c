@@ -11,6 +11,9 @@
 #include <linux/qpnp/qpnp-revid.h>
 #include <linux/irq.h>
 #include <linux/pmic-voter.h>
+#ifdef CONFIG_D8G_SERVICE
+#include <linux/module.h>
+#endif
 #include "smb-lib.h"
 #include "smb-reg.h"
 #include "battery.h"
@@ -26,14 +29,12 @@
 		__func__, ##__VA_ARGS__)	\
 
 #define smblib_dbg(chg, reason, fmt, ...)			\
-	do {							\
-		if (*chg->debug_mask & (reason))		\
-			pr_info("%s: %s: " fmt, chg->name,	\
-				__func__, ##__VA_ARGS__);	\
-		else						\
-			pr_debug("%s: %s: " fmt, chg->name,	\
-				__func__, ##__VA_ARGS__);	\
-	} while (0)
+		do { } while (0)
+
+#ifdef CONFIG_D8G_SERVICE
+bool skip_thermal = false;
+module_param(skip_thermal, bool, 0644);
+#endif
 
 static bool is_secure(struct smb_charger *chg, int addr)
 {
