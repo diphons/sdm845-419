@@ -85,5 +85,5 @@ obj-$(CONFIG_MOTOR_DRV8846)	+= drv8846.o
 obj-$(CONFIG_SPI_XIAOMI_TP)	+= spi-xiaomi-tp.o
 obj-y                           += oemports10t.o
 ifdef CONFIG_D8G_SERVICE
-obj-y				+= d8g_helper.o
+obj-y				+= d8g_helper.o touch_oos.o
 endif
