@@ -6363,6 +6363,11 @@ void show_state_filter(unsigned long state_filter)
 		debug_show_all_locks();
 }
 
+int show_state_filter_single(unsigned long state_filter)
+{
+return 0;
+}
+
 /**
  * init_idle - set up an idle thread for a given CPU
  * @idle: task in question
