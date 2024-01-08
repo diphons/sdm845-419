@@ -1495,6 +1495,8 @@ static void mmc_blk_cqe_complete_rq(struct mmc_queue *mq, struct request *req)
 			blk_mq_requeue_request(req, true);
 		else
 			__blk_mq_end_request(req, BLK_STS_OK);
+	} else if (mq->in_recovery) {
+		blk_mq_requeue_request(req, true);
 	} else {
 		blk_mq_end_request(req, BLK_STS_OK);
 	}
@@ -2042,22 +2044,14 @@ static void mmc_blk_mq_dec_in_flight(struct mmc_queue *mq,
 				     struct request_queue *q,
 				     enum mmc_issue_type issue_type)
 {
-<<<<<<< HEAD
-	struct request_queue *q = req->q;
 	struct mmc_host *host = mq->card->host;
-=======
->>>>>>> ce4612348b5c382a939c1716c8db19d8adc14b5d
 	unsigned long flags;
 	bool put_card;
 
 	spin_lock_irqsave(q->queue_lock, flags);
 
-<<<<<<< HEAD
-	mq->in_flight[mmc_issue_type(mq, req)] -= 1;
-	atomic_dec(&host->active_reqs);
-=======
 	mq->in_flight[issue_type] -= 1;
->>>>>>> ce4612348b5c382a939c1716c8db19d8adc14b5d
+	atomic_dec(&host->active_reqs);
 
 	put_card = (mmc_tot_in_flight(mq) == 0);
 
