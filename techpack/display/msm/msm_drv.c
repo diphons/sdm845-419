@@ -1,4 +1,7 @@
 /*
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ */
+/*
  * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
  * Copyright (C) 2013 Red Hat
  * Author: Rob Clark <robdclark@gmail.com>
@@ -48,6 +51,7 @@
 #include "msm_mmu.h"
 #include "sde_wb.h"
 #include "sde_dbg.h"
+#include "dsi/dsi_panel_mi.h"
 
 /*
  * MSM driver version:
@@ -62,10 +66,14 @@
 #define MSM_VERSION_MINOR	3
 #define MSM_VERSION_PATCHLEVEL	0
 
-#define IDLE_ENCODER_MASK_DEFAULT	1
-#define IDLE_TIMEOUT_MS_DEFAULT		100
+static struct kmem_cache *kmem_vblank_work_pool;
 
 static DEFINE_MUTEX(msm_release_lock);
+atomic_t resume_pending;
+wait_queue_head_t resume_wait_q;
+
+#define IDLE_ENCODER_MASK_DEFAULT	1
+#define IDLE_TIMEOUT_MS_DEFAULT		100
 
 static void msm_fb_output_poll_changed(struct drm_device *dev)
 {
@@ -322,7 +330,7 @@ static void vblank_ctrl_worker(struct kthread_work *work)
 	else
 		kms->funcs->disable_vblank(kms, priv->crtcs[cur_work->crtc_id]);
 
-	kfree(cur_work);
+	kmem_cache_free(kmem_vblank_work_pool, cur_work);
 }
 
 static int vblank_ctrl_queue_work(struct msm_drm_private *priv,
@@ -335,7 +343,7 @@ static int vblank_ctrl_queue_work(struct msm_drm_private *priv,
 	if (!priv || crtc_id >= priv->num_crtcs)
 		return -EINVAL;
 
-	cur_work = kzalloc(sizeof(*cur_work), GFP_ATOMIC);
+	cur_work = kmem_cache_zalloc(kmem_vblank_work_pool, GFP_ATOMIC);
 	if (!cur_work)
 		return -ENOMEM;
 
@@ -563,8 +571,7 @@ static int msm_drm_display_thread_create(struct sched_param param,
 		kthread_init_worker(&priv->disp_thread[i].worker);
 		priv->disp_thread[i].dev = ddev;
 		priv->disp_thread[i].thread =
-			kthread_run_perf_critical(cpu_prime_mask,
-				kthread_worker_fn,
+			kthread_run(kthread_worker_fn,
 				&priv->disp_thread[i].worker,
 				"crtc_commit:%d", priv->disp_thread[i].crtc_id);
 		ret = sched_setscheduler(priv->disp_thread[i].thread,
@@ -583,8 +590,7 @@ static int msm_drm_display_thread_create(struct sched_param param,
 		kthread_init_worker(&priv->event_thread[i].worker);
 		priv->event_thread[i].dev = ddev;
 		priv->event_thread[i].thread =
-			kthread_run_perf_critical(cpu_prime_mask,
-				kthread_worker_fn,
+			kthread_run(kthread_worker_fn,
 				&priv->event_thread[i].worker,
 				"crtc_event:%d", priv->event_thread[i].crtc_id);
 		/**
@@ -631,8 +637,8 @@ static int msm_drm_display_thread_create(struct sched_param param,
 	 * other important events.
 	 */
 	kthread_init_worker(&priv->pp_event_worker);
-	priv->pp_event_thread = kthread_run_perf_critical(cpu_prime_mask,
-			kthread_worker_fn, &priv->pp_event_worker, "pp_event");
+	priv->pp_event_thread = kthread_run(kthread_worker_fn,
+			&priv->pp_event_worker, "pp_event");
 
 	ret = sched_setscheduler(priv->pp_event_thread,
 						SCHED_FIFO, &param);
@@ -701,6 +707,16 @@ static struct msm_kms *_msm_drm_init_helper(struct msm_drm_private *priv,
 	}
 
 	return kms;
+}
+
+static void msm_drm_pm_unreq(struct work_struct *work)
+{
+	struct msm_drm_private *priv = container_of(to_delayed_work(work),
+						    typeof(*priv),
+						    pm_unreq_dwork);
+
+	pm_qos_update_request(&priv->pm_irq_req, PM_QOS_DEFAULT_VALUE);
+	atomic_set_release(&priv->pm_req_set, 0);
 }
 
 static ssize_t idle_encoder_mask_store(struct device *device,
@@ -895,17 +911,22 @@ static int msm_drm_init(struct device *dev, struct drm_driver *drv)
 	INIT_LIST_HEAD(&priv->client_event_list);
 	INIT_LIST_HEAD(&priv->inactive_list);
 
+	priv->pm_req_set = (atomic_t)ATOMIC_INIT(0);
+	INIT_DELAYED_WORK(&priv->pm_unreq_dwork, msm_drm_pm_unreq);
+
 	ret = sde_power_resource_init(pdev, &priv->phandle);
 	if (ret) {
 		pr_err("sde power resource init failed\n");
 		goto power_init_fail;
 	}
 
+#ifdef CONFIG_DEBUG_FS
 	ret = sde_dbg_init(&pdev->dev);
 	if (ret) {
 		dev_err(dev, "failed to init sde dbg: %d\n", ret);
 		goto dbg_init_fail;
 	}
+#endif
 
 	msm_idle_init(ddev);
 
@@ -972,11 +993,13 @@ static int msm_drm_init(struct device *dev, struct drm_driver *drv)
 		priv->fbdev = msm_fbdev_init(ddev);
 #endif
 
+#ifdef CONFIG_DEBUG_FS
 	ret = sde_dbg_debugfs_register(dev);
 	if (ret) {
 		dev_err(dev, "failed to reg sde dbg debugfs: %d\n", ret);
 		goto fail;
 	}
+#endif
 
 	/* perform subdriver post initialization */
 	if (kms && kms->funcs && kms->funcs->postinit) {
@@ -996,14 +1019,17 @@ fail:
 	return ret;
 bind_fail:
 	sde_dbg_destroy();
+#ifdef CONFIG_DEBUG_FS
 dbg_init_fail:
 	sde_power_resource_deinit(pdev, &priv->phandle);
+#endif
 power_init_fail:
 	msm_mdss_destroy(ddev);
 mdss_init_fail:
 	kfree(priv);
 priv_alloc_fail:
 	drm_dev_put(ddev);
+	platform_set_drvdata(pdev, NULL);
 	return ret;
 }
 
@@ -1240,8 +1266,13 @@ static void msm_irq_preinstall(struct drm_device *dev)
 {
 	struct msm_drm_private *priv = dev->dev_private;
 	struct msm_kms *kms = priv->kms;
+	struct sde_kms *sde_kms = to_sde_kms(kms);
 	BUG_ON(!kms);
 	kms->funcs->irq_preinstall(kms);
+	priv->pm_irq_req.type = PM_QOS_REQ_AFFINE_IRQ;
+	priv->pm_irq_req.irq = sde_kms->irq_num;
+	pm_qos_add_request(&priv->pm_irq_req, PM_QOS_CPU_DMA_LATENCY,
+			   PM_QOS_DEFAULT_VALUE);
 }
 
 static int msm_irq_postinstall(struct drm_device *dev)
@@ -1258,6 +1289,8 @@ static void msm_irq_uninstall(struct drm_device *dev)
 	struct msm_kms *kms = priv->kms;
 	BUG_ON(!kms);
 	kms->funcs->irq_uninstall(kms);
+	flush_delayed_work(&priv->pm_unreq_dwork);
+	pm_qos_remove_request(&priv->pm_irq_req);
 }
 
 static int msm_enable_vblank(struct drm_device *dev, unsigned int pipe)
@@ -1881,6 +1914,19 @@ static struct drm_driver msm_driver = {
 };
 
 #ifdef CONFIG_PM_SLEEP
+static int msm_pm_prepare(struct device *dev)
+{
+	atomic_inc(&resume_pending);
+	return 0;
+}
+
+static void msm_pm_complete(struct device *dev)
+{
+	atomic_set(&resume_pending, 0);
+	wake_up_all(&resume_wait_q);
+	return;
+}
+
 static int msm_pm_suspend(struct device *dev)
 {
 	struct drm_device *ddev;
@@ -1966,6 +2012,8 @@ static int msm_runtime_resume(struct device *dev)
 #endif
 
 static const struct dev_pm_ops msm_pm_ops = {
+	.prepare = msm_pm_prepare,
+	.complete = msm_pm_complete,
 	SET_SYSTEM_SLEEP_PM_OPS(msm_pm_suspend, msm_pm_resume)
 	SET_RUNTIME_PM_OPS(msm_runtime_suspend, msm_runtime_resume, NULL)
 };
@@ -2222,6 +2270,8 @@ static void msm_pdev_shutdown(struct platform_device *pdev)
 		return;
 	}
 
+	dsi_panel_power_turn_off(false);
+
 	msm_lastclose(ddev);
 
 	/* set this after lastclose to allow kickoff from lastclose */
@@ -2245,6 +2295,7 @@ static struct platform_driver msm_platform_driver = {
 		.of_match_table = dt_match,
 		.pm     = &msm_pm_ops,
 		.suppress_bind_attrs = true,
+		.probe_type = PROBE_PREFER_ASYNCHRONOUS,
 	},
 };
 
@@ -2254,6 +2305,7 @@ static int __init msm_drm_register(void)
 		return -EINVAL;
 
 	DBG("init");
+	kmem_vblank_work_pool = KMEM_CACHE(vblank_work, SLAB_HWCACHE_ALIGN | SLAB_PANIC);
 	msm_smmu_driver_init();
 	msm_dsi_register();
 	msm_edp_register();

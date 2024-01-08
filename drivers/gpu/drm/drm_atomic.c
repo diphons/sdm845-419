@@ -35,6 +35,7 @@
 #include <linux/cpu_input_boost.h>
 #endif
 #include <linux/devfreq_boost.h>
+#include <linux/pm_qos.h>
 #include <linux/sync_file.h>
 #ifdef CONFIG_D8G_SERVICE
 #include <misc/d8g_helper.h>
@@ -98,12 +99,6 @@ drm_atomic_state_init(struct drm_device *dev, struct drm_atomic_state *state)
 	if (!state->planes)
 		goto fail;
 
-	/*
-	 * Because drm_atomic_state can be committed asynchronously we need our
-	 * own reference and cannot rely on the on implied by drm_file in the
-	 * ioctl call.
-	 */
-	drm_dev_get(dev);
 	state->dev = dev;
 
 	DRM_DEBUG_ATOMIC("Allocated atomic state %p\n", state);
@@ -263,8 +258,7 @@ EXPORT_SYMBOL(drm_atomic_state_clear);
 void __drm_atomic_state_free(struct kref *ref)
 {
 	struct drm_atomic_state *state = container_of(ref, typeof(*state), ref);
-	struct drm_device *dev = state->dev;
-	struct drm_mode_config *config = &dev->mode_config;
+	struct drm_mode_config *config = &state->dev->mode_config;
 
 	drm_atomic_state_clear(state);
 
@@ -276,8 +270,6 @@ void __drm_atomic_state_free(struct kref *ref)
 		drm_atomic_state_default_release(state);
 		kfree(state);
 	}
-
-	drm_dev_put(dev);
 }
 EXPORT_SYMBOL(__drm_atomic_state_free);
 
@@ -1303,9 +1295,21 @@ drm_atomic_get_connector_state(struct drm_atomic_state *state,
 		struct __drm_connnectors_state *c;
 		int alloc = max(index + 1, config->num_connector);
 
-		c = krealloc(state->connectors, alloc * sizeof(*state->connectors), GFP_KERNEL);
-		if (!c)
-			return ERR_PTR(-ENOMEM);
+		if (state->connectors_preallocated) {
+			state->connectors_preallocated = false;
+			c = kmalloc(alloc * sizeof(*state->connectors),
+				    GFP_KERNEL);
+			if (!c)
+				return ERR_PTR(-ENOMEM);
+			memcpy(c, state->connectors,
+			       sizeof(*state->connectors) * state->num_connector);
+		} else {
+			c = krealloc(state->connectors,
+				     alloc * sizeof(*state->connectors),
+				     GFP_KERNEL);
+			if (!c)
+				return ERR_PTR(-ENOMEM);
+		}
 
 		state->connectors = c;
 		memset(&state->connectors[state->num_connector], 0,
@@ -1721,27 +1725,6 @@ drm_atomic_set_crtc_for_connector(struct drm_connector_state *conn_state,
 {
 	struct drm_connector *connector = conn_state->connector;
 	struct drm_crtc_state *crtc_state;
-
-	/*
-	 * For compatibility with legacy users, we want to make sure that
-	 * we allow DPMS On<->Off modesets on unregistered connectors, since
-	 * legacy modesetting users will not be expecting these to fail. We do
-	 * not however, want to allow legacy users to assign a connector
-	 * that's been unregistered from sysfs to another CRTC, since doing
-	 * this with a now non-existent connector could potentially leave us
-	 * in an invalid state.
-	 *
-	 * Since the connector can be unregistered at any point during an
-	 * atomic check or commit, this is racy. But that's OK: all we care
-	 * about is ensuring that userspace can't use this connector for new
-	 * configurations after it's been notified that the connector is no
-	 * longer present.
-	 */
-	if (!READ_ONCE(connector->registered) && crtc) {
-		DRM_DEBUG_ATOMIC("[CONNECTOR:%d:%s] is not registered\n",
-				 connector->base.id, connector->name);
-		return -EINVAL;
-	}
 
 	if (conn_state->crtc == crtc)
 		return 0;
@@ -2572,8 +2555,8 @@ static void complete_signaling(struct drm_device *dev,
 	kfree(fence_state);
 }
 
-int drm_mode_atomic_ioctl(struct drm_device *dev,
-			  void *data, struct drm_file *file_priv)
+static int __drm_mode_atomic_ioctl(struct drm_device *dev, void *data,
+				   struct drm_file *file_priv)
 {
 	struct drm_mode_atomic *arg = data;
 	uint32_t __user *objs_ptr = (uint32_t __user *)(unsigned long)(arg->objs_ptr);
@@ -2740,6 +2723,36 @@ out:
 
 	drm_modeset_drop_locks(&ctx);
 	drm_modeset_acquire_fini(&ctx);
+
+	return ret;
+}
+
+int drm_mode_atomic_ioctl(struct drm_device *dev, void *data,
+			  struct drm_file *file_priv)
+{
+	/*
+	 * Optimistically assume the current task won't migrate to another CPU
+	 * and restrict the current CPU to shallow idle states so that it won't
+	 * take too long to finish running the ioctl whenever the ioctl runs a
+	 * command that sleeps, such as for an "atomic" commit. Apply this
+	 * restriction to the prime CPU as well in anticipation of it processing
+	 * the DRM IRQ and any other display commit work, so that it wakes up
+	 * now if it's in a deep idle state.
+	 */
+	struct pm_qos_request req = {
+		.type = PM_QOS_REQ_AFFINE_CORES,
+		.cpus_affine = ATOMIC_INIT(BIT(raw_smp_processor_id()) |
+#ifdef CONFIG_ARCH_SDM845
+					   *cpumask_bits(cpu_perf_mask))
+#else
+					   *cpumask_bits(cpu_prime_mask))
+#endif
+	};
+	int ret;
+
+	pm_qos_add_request(&req, PM_QOS_CPU_DMA_LATENCY, 100);
+	ret = __drm_mode_atomic_ioctl(dev, data, file_priv);
+	pm_qos_remove_request(&req);
 
 	return ret;
 }
