@@ -1,8 +1,14 @@
-/* SPDX-License-Identifier: GPL-2.0-only */
-/*
+/* SPDX-License-Identifier: GPL-2.0
+ *
+ * linux/drivers/staging/erofs/xattr.h
+ *
  * Copyright (C) 2017-2018 HUAWEI, Inc.
  *             http://www.huawei.com/
  * Created by Gao Xiang <gaoxiang25@huawei.com>
+ *
+ * This file is subject to the terms and conditions of the GNU General Public
+ * License.  See the file COPYING in the main directory of the Linux
+ * distribution for more details.
  */
 #ifndef __EROFS_XATTR_H
 #define __EROFS_XATTR_H
@@ -14,14 +20,14 @@
 /* Attribute not found */
 #define ENOATTR         ENODATA
 
-static inline unsigned int inlinexattr_header_size(struct inode *inode)
+static inline unsigned inlinexattr_header_size(struct inode *inode)
 {
-	return sizeof(struct erofs_xattr_ibody_header) +
-		sizeof(u32) * EROFS_I(inode)->xattr_shared_count;
+	return sizeof(struct erofs_xattr_ibody_header)
+		+ sizeof(u32) * EROFS_V(inode)->xattr_shared_count;
 }
 
-static inline erofs_blk_t xattrblock_addr(struct erofs_sb_info *sbi,
-					  unsigned int xattr_id)
+static inline erofs_blk_t
+xattrblock_addr(struct erofs_sb_info *sbi, unsigned xattr_id)
 {
 #ifdef CONFIG_EROFS_FS_XATTR
 	return sbi->xattr_blkaddr +
@@ -31,20 +37,19 @@ static inline erofs_blk_t xattrblock_addr(struct erofs_sb_info *sbi,
 #endif
 }
 
-static inline unsigned int xattrblock_offset(struct erofs_sb_info *sbi,
-					     unsigned int xattr_id)
+static inline unsigned
+xattrblock_offset(struct erofs_sb_info *sbi, unsigned xattr_id)
 {
 	return (xattr_id * sizeof(__u32)) % EROFS_BLKSIZ;
 }
 
-#ifdef CONFIG_EROFS_FS_XATTR
 extern const struct xattr_handler erofs_xattr_user_handler;
 extern const struct xattr_handler erofs_xattr_trusted_handler;
 #ifdef CONFIG_EROFS_FS_SECURITY
 extern const struct xattr_handler erofs_xattr_security_handler;
 #endif
 
-static inline const struct xattr_handler *erofs_xattr_handler(unsigned int idx)
+static inline const struct xattr_handler *erofs_xattr_handler(unsigned index)
 {
 static const struct xattr_handler *xattr_handler_map[] = {
 	[EROFS_XATTR_INDEX_USER] = &erofs_xattr_user_handler,
@@ -58,34 +63,30 @@ static const struct xattr_handler *xattr_handler_map[] = {
 	[EROFS_XATTR_INDEX_SECURITY] = &erofs_xattr_security_handler,
 #endif
 };
-
-	return idx && idx < ARRAY_SIZE(xattr_handler_map) ?
-		xattr_handler_map[idx] : NULL;
+	return index && index < ARRAY_SIZE(xattr_handler_map) ?
+		xattr_handler_map[index] : NULL;
 }
 
-extern const struct xattr_handler *erofs_xattr_handlers[];
+#ifdef CONFIG_EROFS_FS_XATTR
+
+extern const struct inode_operations erofs_generic_xattr_iops;
+extern const struct inode_operations erofs_dir_xattr_iops;
 
 int erofs_getxattr(struct inode *, int, const char *, void *, size_t);
 ssize_t erofs_listxattr(struct dentry *, char *, size_t);
 #else
-static inline int erofs_getxattr(struct inode *inode, int index,
-				 const char *name, void *buffer,
-				 size_t buffer_size)
+static int __maybe_unused erofs_getxattr(struct inode *inode, int index,
+	const char *name,
+	void *buffer, size_t buffer_size)
 {
-	return -EOPNOTSUPP;
+	return -ENOTSUPP;
 }
 
-static inline ssize_t erofs_listxattr(struct dentry *dentry,
-				      char *buffer, size_t buffer_size)
+static ssize_t __maybe_unused erofs_listxattr(struct dentry *dentry,
+	char *buffer, size_t buffer_size)
 {
-	return -EOPNOTSUPP;
+	return -ENOTSUPP;
 }
-#endif	/* !CONFIG_EROFS_FS_XATTR */
-
-#ifdef CONFIG_EROFS_FS_POSIX_ACL
-struct posix_acl *erofs_get_acl(struct inode *inode, int type);
-#else
-#define erofs_get_acl	(NULL)
 #endif
 
 #endif
