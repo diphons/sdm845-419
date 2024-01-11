@@ -24,7 +24,7 @@
 #include "adsp_err.h"
 #include <dsp/voice_mhi.h>
 
-#define TIMEOUT_MS 300
+#define TIMEOUT_MS 1000
 
 
 #define CMD_STATUS_SUCCESS 0
@@ -2756,13 +2756,6 @@ static int voice_send_cvs_register_cal_cmd(struct voice_data *v)
 		pr_err("%s: Voice_get_cal failed for cal %d!\n",
 			__func__, CVS_VOCSTRM_CAL);
 
-		goto unlock;
-	}
-
-	if (col_data->cal_data.size >= MAX_COL_INFO_SIZE) {
-		pr_err("%s: Invalid cal data size %ld!\n",
-			__func__, col_data->cal_data.size);
-		ret = -EINVAL;
 		goto unlock;
 	}
 
