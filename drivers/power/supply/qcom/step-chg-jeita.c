@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2017-2019 The Linux Foundation. All rights reserved.
- * Copyright (C) 2021 XiaoMi, Inc.
  */
 
 #define pr_fmt(fmt) "QCOM-STEPCHG: %s: " fmt, __func__
@@ -790,6 +789,7 @@ static int handle_fast_charge(struct step_chg_info *chip, int temp)
 }
 
 
+
 /* set JEITA_SUSPEND_HYST_UV to 70mV to avoid recharge frequently when jeita warm */
 #define JEITA_SUSPEND_HYST_UV		120000
 #define JEITA_HYSTERESIS_TEMP_THRED	150
@@ -962,9 +962,6 @@ static int handle_jeita(struct step_chg_info *chip)
 	if (!chip->usb_icl_votable)
 		goto set_jeita_fv;
 
-	pr_info("%s = %d FCC = %duA FV = %duV\n",
-		chip->jeita_fcc_config->param.prop_name, temp, fcc_ua, fv_uv);
-	pr_err("battery warm = %d battery cool = %d\n", chip->jeita_warm_th, chip->jeita_cool_th);
 	handle_fast_charge(chip, temp);
 
 	/*
@@ -973,8 +970,8 @@ static int handle_jeita(struct step_chg_info *chip)
 	 */
 	rc = power_supply_get_property(chip->batt_psy,
 				POWER_SUPPLY_PROP_VOLTAGE_MAX, &pval);
-	pr_info("%s = %d max voltage= %duv FV = %duV\n",
-		chip->jeita_fcc_config->param.prop_name, temp, pval.intval, fv_uv);
+	pr_info("%s = %d FCC = %duA FV = %duV %s = %d max voltage= %duv battery warm = %d battery cool = %d\n",
+		chip->jeita_fcc_config->param.prop_name, temp, fcc_ua, fv_uv, chip->jeita_fcc_config->param.prop_name, temp, pval.intval, chip->jeita_warm_th, chip->jeita_cool_th);
 	if (rc || (pval.intval == fv_uv)) {
 		vote(chip->usb_icl_votable, JEITA_VOTER, false, 0);
 		goto set_jeita_fv;

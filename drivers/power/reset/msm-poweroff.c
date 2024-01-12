@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
  * Copyright (c) 2013-2019, The Linux Foundation. All rights reserved.
- * Copyright (C) 2021 XiaoMi, Inc.
  */
 
 #include <linux/delay.h>
@@ -39,7 +38,11 @@
 #define SCM_DLOAD_FULLDUMP		0X10
 #define SCM_EDLOAD_MODE			0X01
 #define SCM_DLOAD_CMD			0x10
+#ifndef CONFIG_BOARD_XIAOMI
+#define SCM_DLOAD_MINIDUMP		0X20
+#else
 #define SCM_DLOAD_MINIDUMP		0X40
+#endif
 #define SCM_DLOAD_BOTHDUMPS	(SCM_DLOAD_MINIDUMP | SCM_DLOAD_FULLDUMP)
 
 #define DL_MODE_PROP "qcom,msm-imem-download_mode"
@@ -67,8 +70,13 @@ static void scm_disable_sdi(void);
 static int download_mode = 1;
 static struct kobject dload_kobj;
 
+#ifndef CONFIG_BOARD_XIAOMI
+static int in_panic;
+static int dload_type = SCM_DLOAD_FULLDUMP;
+#else
 int in_panic = 0;
 static int dload_type = SCM_DLOAD_BOTHDUMPS;
+#endif
 static void *dload_mode_addr;
 static bool dload_mode_enabled;
 static void *emergency_dload_mode_addr;
@@ -499,9 +507,7 @@ static void msm_restart_prepare(const char *cmd)
 
 	if (qpnp_pon_check_hard_reset_stored()) {
 		/* Set warm reset as true when device is in dload mode */
-		if (get_dload_mode() ||
-			((cmd != NULL && cmd[0] != '\0') &&
-			!strcmp(cmd, "edl")))
+		if (get_dload_mode())
 			need_warm_reset = true;
 	} else {
 		need_warm_reset = (get_dload_mode() ||
