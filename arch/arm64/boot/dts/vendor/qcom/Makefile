@@ -1,3 +1,5 @@
+ifeq ($(CONFIG_BOARD_XIAOMI),y)
+
 ifeq ($(CONFIG_BOARD_XIAOMI_SM8250),y)
 ifeq ($(CONFIG_BUILD_ARM64_DT_OVERLAY),y)
 
@@ -55,8 +57,10 @@ dtbo-$(CONFIG_BOARD_UMI) += \
 umi-sm8250-overlay.dtbo-base := kona.dtb kona-v2.dtb kona-v2.1.dtb
 endif
 
-endif
-endif
+endif # CONFIG_BUILD_ARM64_DT_OVERLAY
+endif # CONFIG_BOARD_XIAOMI_SM8250
+
+else # CONFIG_BOARD_XIAOMI
 
 ifeq ($(CONFIG_BOARD_XIAOMI_SM7250),y)
 ifeq ($(CONFIG_BUILD_ARM64_DT_OVERLAY),y)
@@ -482,6 +486,8 @@ dtb-$(CONFIG_ARCH_SDM429) += sdm429-mtp.dtb \
 	sda429-cdp.dtb
 endif
 endif
+
+endif # CONFIG_BOARD_XIAOMI
 
 always		:= $(dtb-y)
 subdir-y	:= $(dts-dirs)
