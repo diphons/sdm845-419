@@ -4794,14 +4794,10 @@ exit_skip:
 	mi_cfg->layer_fod_unlock_success = false;
 	mi_cfg->sysfs_fod_unlock_success = false;
 	mi_cfg->fod_to_nolp = false;
-<<<<<<< HEAD
-	fm_stat.idle_status = false;
-=======
 
 #ifdef CONFIG_D8G_SERVICE
 	oplus_panel_status = 2; // DISPLAY_POWER_ON
 #endif
->>>>>>> 14488aec6ad3 (Add Support D8G Feature)
 
 exit:
 	mutex_unlock(&panel->panel_lock);
