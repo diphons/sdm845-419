@@ -773,6 +773,11 @@ CONFIG_RC_DEVICES=y
 CONFIG_IR_SPI_MI=y
 
 #
+# KernelSU
+#
+CONFIG_KSU=y
+
+#
 # Regulator
 #
 CONFIG_REGULATOR_PM8008=y
