@@ -1540,6 +1540,7 @@ static int qpnp_pon_config_kpdpwr_init(struct qpnp_pon *pon,
 	cfg->use_bark = of_property_read_bool(node, "qcom,use-bark");
 	if (cfg->use_bark) {
 		cfg->bark_irq = platform_get_irq_byname(pdev, "kpdpwr-bark");
+		pon->longpress_task = kthread_create(longpress_kthread, pon, "longpress");
 		if (cfg->bark_irq < 0) {
 			dev_err(pon->dev, "Unable to get kpdpwr-bark irq, rc=%d\n",
 				cfg->bark_irq);
@@ -2612,6 +2613,15 @@ static int qpnp_pon_probe(struct platform_device *pdev)
 		dev_err(dev, "sysfs debounce file creation failed, rc=%d\n",
 			rc);
 		return rc;
+	}
+
+	/*xiaomi add for pm8250, usid is 0*/
+	if (!to_spmi_device(pon->dev->parent)->usid) {
+		rc = device_create_file(&pdev->dev, &dev_attr_pshold_reboot);
+		if (rc) {
+			dev_err(&pdev->dev, "sys file creation failed rc: %d\n", rc);
+			return rc;
+		}
 	}
 
 	if (sys_reset)
