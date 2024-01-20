@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/slab.h>
@@ -3835,7 +3835,7 @@ static int cam_ife_mgr_config_hw(void *hw_mgr_priv,
 		for (i = 0; i < CAM_IFE_HW_CONFIG_WAIT_MAX_TRY; i++) {
 			rem_jiffies = wait_for_completion_timeout(
 				&ctx->config_done_complete,
-				msecs_to_jiffies(100));
+				msecs_to_jiffies(30));
 			if (rem_jiffies == 0) {
 				if (!cam_cdm_detect_hang_error(
 						ctx->cdm_handle)) {
@@ -4277,8 +4277,6 @@ static int cam_ife_mgr_start_hw(void *hw_mgr_priv, void *start_hw_args)
 	bool                              res_rdi_context_set = false;
 	uint32_t                          primary_rdi_src_res;
 	uint32_t                          primary_rdi_out_res;
-	uint32_t                          last_rdi_src_res, last_rdi_res;
-	uint32_t                          last_rdi_out_res;
 
 	primary_rdi_src_res = CAM_ISP_HW_VFE_IN_MAX;
 	primary_rdi_out_res = CAM_ISP_IFE_OUT_RES_MAX;
@@ -4383,29 +4381,6 @@ start_only:
 
 	CAM_DBG(CAM_ISP, "START IFE OUT ... in ctx id:%d",
 		ctx->ctx_index);
-
-	/* Find out last rdi out resource */
-	for (i = 0; i < CAM_IFE_HW_OUT_RES_MAX; i++) {
-		hw_mgr_res = &ctx->res_list_ife_out[i];
-		switch (hw_mgr_res->res_id) {
-		case CAM_ISP_IFE_OUT_RES_RDI_0:
-		case CAM_ISP_IFE_OUT_RES_RDI_1:
-		case CAM_ISP_IFE_OUT_RES_RDI_2:
-		case CAM_ISP_IFE_OUT_RES_RDI_3:
-			if (ctx->is_rdi_only_context) {
-				last_rdi_res = i;
-				last_rdi_out_res = hw_mgr_res->res_id;
-			}
-		default:
-			break;
-		}
-	}
-	if (ctx->is_rdi_only_context) {
-		hw_mgr_res = &ctx->res_list_ife_out[last_rdi_res];
-		hw_mgr_res->hw_res[0]->rdi_only_last_res =
-				ctx->is_rdi_only_context;
-	}
-
 	/* start the IFE out devices */
 	for (i = 0; i < CAM_IFE_HW_OUT_RES_MAX; i++) {
 		hw_mgr_res = &ctx->res_list_ife_out[i];
@@ -4437,10 +4412,6 @@ start_only:
 		primary_rdi_src_res =
 			cam_convert_rdi_out_res_id_to_src(primary_rdi_out_res);
 
-	if (last_rdi_out_res < CAM_ISP_IFE_OUT_RES_MAX)
-		last_rdi_src_res =
-			cam_convert_rdi_out_res_id_to_src(last_rdi_out_res);
-
 	CAM_DBG(CAM_ISP, "START IFE SRC ... in ctx id:%d",
 		ctx->ctx_index);
 	/* Start the IFE mux in devices */
@@ -4449,11 +4420,6 @@ start_only:
 			hw_mgr_res->hw_res[0]->rdi_only_ctx =
 				ctx->is_rdi_only_context;
 		}
-
-		if (last_rdi_src_res == hw_mgr_res->res_id)
-			hw_mgr_res->hw_res[0]->rdi_only_last_res =
-				ctx->is_rdi_only_context;
-
 		rc = cam_ife_hw_mgr_start_hw_res(hw_mgr_res, ctx);
 		if (rc) {
 			CAM_ERR(CAM_ISP, "Can not start IFE Mux (%d)",
@@ -6769,6 +6735,7 @@ static int cam_ife_mgr_dump(void *hw_mgr_priv, void *args)
 		}
 	}
 	dump_args->offset = isp_hw_dump_args.offset;
+	cam_mem_put_cpu_buf(dump_args->buf_handle);
 end:
 	CAM_DBG(CAM_ISP, "offset %u", dump_args->offset);
 	return rc;
