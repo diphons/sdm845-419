@@ -1355,6 +1355,7 @@ static int __cam_req_mgr_check_sync_req_is_ready(
 	return 0;
 }
 
+#ifdef CONFIG_BOARD_DAGU
 /**
  * __cam_req_mgr_check_peer_req_is_applied()
  *
@@ -1432,6 +1433,7 @@ end:
 
 	return applied;
 }
+#endif
 
 /**
  * __cam_req_mgr_process_req()
@@ -1536,6 +1538,7 @@ static int __cam_req_mgr_process_req(struct cam_req_mgr_core_link *link,
 
 			rc = __cam_req_mgr_inject_delay(link->req.l_tbl,
 				slot->idx);
+#ifdef CONFIG_BOARD_DAGU
 			if (!rc) {
 				if (in_q->slot[in_q->rd_idx].req_id != -1) {
 					rc = __cam_req_mgr_check_peer_req_is_applied(
@@ -1551,6 +1554,11 @@ static int __cam_req_mgr_process_req(struct cam_req_mgr_core_link *link,
 						slot->idx, false);
 				}
 			}
+#else
+			if (!rc)
+				rc = __cam_req_mgr_check_link_is_ready(link,
+					slot->idx, false);
+#endif
 		}
 
 		if (rc < 0) {

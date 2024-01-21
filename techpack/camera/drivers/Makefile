@@ -13,5 +13,7 @@ obj-$(CONFIG_SPECTRA_CAMERA) += cam_fd/
 obj-$(CONFIG_SPECTRA_CAMERA) += cam_lrme/
 obj-$(CONFIG_SPECTRA_CAMERA) += cam_cust/
 
+ifdef CONFIG_BOARD_DAGU
 cameralog-y := cam_log/cam_log.o
 obj-$(CONFIG_SPECTRA_CAMERA) += cameralog.o
+endif
