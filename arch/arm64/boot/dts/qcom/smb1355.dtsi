@@ -16,7 +16,6 @@ smb1355_0: qcom,smb1355@8 {
 	interrupt-controller;
 	#interrupt-cells = <3>;
 	qcom,periph-map = <0x10 0x12 0x13 0x16>;
-	status = "disabled";
 
 	smb1355_revid_0: qcom,revid@100 {
 		compatible = "qcom,qpnp-revid";
@@ -64,7 +63,6 @@ smb1355_1: qcom,smb1355@c {
 	interrupt-controller;
 	#interrupt-cells = <3>;
 	qcom,periph-map = <0x10 0x12 0x13 0x16>;
-	status = "disabled";
 
 	smb1355_revid_1: qcom,revid@100 {
 		compatible = "qcom,qpnp-revid";
