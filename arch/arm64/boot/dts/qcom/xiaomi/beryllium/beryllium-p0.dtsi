@@ -20,99 +20,7 @@
 #include "../xiaomi-common.dtsi"
 
 &qupv3_se10_i2c {
-	smb1355_0: qcom,smb1355@8 {
-		compatible = "qcom,i2c-pmic";
-		reg = <0x8>;
-		#address-cells = <1>;
-		#size-cells = <0>;
-		interrupt-parent = <&spmi_bus>;
-		interrupts = <0x0 0xd1 0x0 IRQ_TYPE_LEVEL_LOW>;
-		interrupt_names = "smb1355_0";
-		interrupt-controller;
-		#interrupt-cells = <3>;
-		qcom,periph-map = <0x10 0x12 0x13 0x16>;
-
-		smb1355_revid_0: qcom,revid@100 {
-			compatible = "qcom,qpnp-revid";
-			reg = <0x100 0x100>;
-		};
-
-		smb1355_charger_0: qcom,smb1355-charger@1000 {
-			compatible = "qcom,smb1355";
-			qcom,pmic-revid = <&smb1355_revid_0>;
-			reg = <0x1000 0x700>;
-			#address-cells = <1>;
-			#size-cells = <1>;
-			interrupt-parent = <&smb1355_0>;
-			status = "disabled";
-
-			io-channels = <&pmi8998_rradc 2>,
-				      <&pmi8998_rradc 12>;
-			io-channel-names = "charger_temp",
-					   "charger_temp_max";
-
-			qcom,chgr@1000 {
-				reg = <0x1000 0x100>;
-				interrupts = <0x10 0x1 IRQ_TYPE_EDGE_RISING>;
-				interrupt-names = "chg-state-change";
-			};
-
-			qcom,chgr-misc@1600 {
-				reg = <0x1600 0x100>;
-				interrupts = <0x16 0x1 IRQ_TYPE_EDGE_RISING>,
-					     <0x16 0x6 IRQ_TYPE_EDGE_RISING>;
-				interrupt-names = "wdog-bark",
-						  "temperature-change";
-			};
-		};
-	};
-
-	smb1355_1: qcom,smb1355@c {
-		compatible = "qcom,i2c-pmic";
-		reg = <0xc>;
-		#address-cells = <1>;
-		#size-cells = <0>;
-		interrupt-parent = <&spmi_bus>;
-		interrupts = <0x0 0xd1 0x0 IRQ_TYPE_LEVEL_LOW>;
-		interrupt_names = "smb1355_1";
-		interrupt-controller;
-		#interrupt-cells = <3>;
-		qcom,periph-map = <0x10 0x12 0x13 0x16>;
-
-		smb1355_revid_1: qcom,revid@100 {
-			compatible = "qcom,qpnp-revid";
-			reg = <0x100 0x100>;
-		};
-
-		smb1355_charger_1: qcom,smb1355-charger@1000 {
-			compatible = "qcom,smb1355";
-			qcom,pmic-revid = <&smb1355_revid_1>;
-			reg = <0x1000 0x700>;
-			#address-cells = <1>;
-			#size-cells = <1>;
-			interrupt-parent = <&smb1355_1>;
-			status = "disabled";
-
-			io-channels = <&pmi8998_rradc 2>,
-				      <&pmi8998_rradc 12>;
-			io-channel-names = "charger_temp",
-					   "charger_temp_max";
-
-			qcom,chgr@1000 {
-				reg = <0x1000 0x100>;
-				interrupts = <0x10 0x1 IRQ_TYPE_EDGE_RISING>;
-				interrupt-names = "chg-state-change";
-			};
-
-			qcom,chgr-misc@1600 {
-				reg = <0x1600 0x100>;
-				interrupts = <0x16 0x1 IRQ_TYPE_EDGE_RISING>,
-					     <0x16 0x6 IRQ_TYPE_EDGE_RISING>;
-				interrupt-names = "wdog-bark",
-						  "temperature-change";
-			};
-		};
-	};
+#include "../../smb1355.dtsi"
 };
 
 &removed_region1 {
@@ -451,7 +359,7 @@
 
 &pmi8998_lpg {
 	status = "okay";
-/* Need to adapt these changes to new lpg drivers
+/* FIXME: Need to adapt these changes to new lpg drivers
 	qcom,period = <25000>;
 
 	qcom,pwm {
@@ -503,7 +411,6 @@
 
 &qupv3_se10_i2c {
 	status = "ok";
-	/* Need to fix pmi8998_pwm_1 first
 	lm3644@63 {
 		compatible = "leds-lm3644";
 		reg = <0x63>;
@@ -516,11 +423,10 @@
 		pinctrl-2 = <&lm3644_led_suspend &lm3644_pwm_disabled>;
 
 		lm3644,use-simulative-pwm;
-		pwms = <&pmi8998_pwm_1 0 0>;
+		pwms = <&pmi8998_lpg 1 25000>; // FIXME: Recheck if 25000 is correct
 		lm3644,period-us = <25000>;
 		lm3644,duty-us = <2500>;
 	};
-	*/
 };
 
 
@@ -543,7 +449,7 @@
 		novatek,reset-gpio = <&tlmm 32 0x00>;
 		novatek,irq-gpio = <&tlmm 31 0x2001>;
 		pinctrl-names = "pmx_ts_active", "pmx_ts_suspend";
-		pinctrl-0 = <&ts_int_active &ts_reset_active>;
+		pinctrl-0 = <&ts_int_active_cust &ts_reset_active_cust>;
 		pinctrl-1 = <&ts_int_suspend &ts_reset_suspend>;
 		novatek,config-array-size = <2>;
 		panel = <&dsi_tianma_fhd_nt36672a_video_display>;
@@ -561,6 +467,7 @@
 		/* MP */
 		/*novatek,mp-support-dt;*/
 	};
+#ifdef CONFIG_TOUCHSCREEN_FTS_MI845
 	focaltech@38 {
 		compatible = "focaltech,focal";
 		reg = <0x38>;
@@ -580,11 +487,30 @@
 		focaltech,timeout-read-reg = <1000>;
 		focaltech,cutoff-power;
 		pinctrl-names = "pmx_ts_active", "pmx_ts_suspend";
-		pinctrl-0 = <&ts_int_active &ts_reset_active>;
+		pinctrl-0 = <&ts_int_active_cust &ts_reset_active_cust>;
 		pinctrl-1 = <&ts_int_suspend &ts_reset_suspend>;
 		panel = <&dsi_ebbg_fhd_ft8719_video_display>;
 		/* focaltech,have-key; */
 	};
+#else
+	focaltech@38 {
+		compatible = "focaltech,ft8719";
+		reg = <0x38>;
+
+		interrupts-extended = <&tlmm 31 IRQ_TYPE_EDGE_FALLING>;
+		reset-gpios = <&tlmm 32 GPIO_ACTIVE_LOW>;
+
+		iovcc-supply = <&pm8998_l14>;
+
+		pinctrl-0 = <&ts_int_active_cust &ts_reset_active_cust>;
+		pinctrl-1 = <&ts_int_suspend &ts_reset_suspend>;
+		pinctrl-names = "default", "sleep";
+
+		touchscreen-size-x = <1080>;
+		touchscreen-size-y = <2246>;
+		panel = <&dsi_ebbg_fhd_ft8719_video_display>;
+	};
+#endif
 };
 
 &qupv3_se6_4uart {
