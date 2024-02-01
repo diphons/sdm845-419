@@ -1963,9 +1963,6 @@ void wcd_mbhc_stop(struct wcd_mbhc *mbhc)
 		} else {
 			fsa4480_unreg_notifier(&mbhc->fsa_nb, mbhc->fsa_np);
 		}
-	} else {
-		if (mbhc->fsa_nb.notifier_call != NULL)
-			power_supply_unreg_notifier(&mbhc->fsa_nb);
 	}
 
 	pr_debug("%s: leave\n", __func__);
