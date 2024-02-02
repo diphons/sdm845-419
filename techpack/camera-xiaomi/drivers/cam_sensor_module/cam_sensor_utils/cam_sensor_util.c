@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2017-2020, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/kernel.h>
@@ -38,29 +39,6 @@ static struct i2c_settings_list*
 	tmp->i2c_settings.size = size;
 
 	return tmp;
-}
-
-int32_t cam_sensor_util_get_current_qtimer_ns(uint64_t *qtime_ns)
-{
-	uint64_t ticks = 0;
-	int32_t rc = 0;
-
-	ticks = arch_timer_read_counter();
-	if (ticks == 0) {
-		CAM_ERR(CAM_SENSOR, "qtimer returned 0, rc:%d", rc);
-		return -EINVAL;
-	}
-
-	if (qtime_ns != NULL) {
-		*qtime_ns = mul_u64_u32_div(ticks,
-			QTIMER_MUL_FACTOR, QTIMER_DIV_FACTOR);
-		CAM_DBG(CAM_SENSOR, "Qtimer time: 0x%x", *qtime_ns);
-	} else {
-		CAM_ERR(CAM_SENSOR, "NULL pointer passed");
-		return -EINVAL;
-	}
-
-	return rc;
 }
 
 int32_t delete_request(struct i2c_settings_array *i2c_array)
@@ -297,64 +275,7 @@ static int32_t cam_sensor_get_io_buffer(
 			io_cfg->direction);
 		rc = -EINVAL;
 	}
-	return rc;
-}
-
-int32_t cam_sensor_util_write_qtimer_to_io_buffer(
-	struct cam_buf_io_cfg *io_cfg)
-{
-	uintptr_t buf_addr = 0x0, target_buf = 0x0;
-	size_t buf_size = 0, target_size = 0;
-	int32_t rc = 0;
-	uint64_t qtime_ns = 0;
-
-	if (io_cfg == NULL) {
-		CAM_ERR(CAM_SENSOR,
-			"Invalid args, io buf is NULL");
-		return -EINVAL;
-	}
-
-	if (io_cfg->direction == CAM_BUF_OUTPUT) {
-		rc = cam_mem_get_cpu_buf(io_cfg->mem_handle[0],
-			&buf_addr, &buf_size);
-		if ((rc < 0) || (!buf_addr)) {
-			CAM_ERR(CAM_SENSOR,
-				"invalid buffer, rc: %d, buf_addr: %pK",
-				rc, buf_addr);
-			return -EINVAL;
-		}
-		CAM_DBG(CAM_SENSOR,
-			"buf_addr: %pK, buf_size: %zu, offsetsize: %d",
-			(void *)buf_addr, buf_size, io_cfg->offsets[0]);
-		if (io_cfg->offsets[0] >= buf_size) {
-			CAM_ERR(CAM_SENSOR,
-				"invalid size:io_cfg->offsets[0]: %d, buf_size: %d",
-				io_cfg->offsets[0], buf_size);
-			return -EINVAL;
-		}
-
-		target_buf  = buf_addr + io_cfg->offsets[0];
-		target_size = buf_size - io_cfg->offsets[0];
-
-		if (target_size < sizeof(uint64_t)) {
-			CAM_ERR(CAM_SENSOR,
-				"not enough size for qtimer, target_size:%d",
-				target_size);
-			return -EINVAL;
-		}
-
-		rc = cam_sensor_util_get_current_qtimer_ns(&qtime_ns);
-		if (rc < 0) {
-			CAM_ERR(CAM_SENSOR, "failed to get qtimer rc:%d");
-			return rc;
-		}
-
-		memcpy((void *)target_buf, &qtime_ns, sizeof(uint64_t));
-	} else {
-		CAM_ERR(CAM_SENSOR, "Invalid direction: %d",
-			io_cfg->direction);
-		rc = -EINVAL;
-	}
+	cam_mem_put_cpu_buf(io_cfg->mem_handle[0]);
 	return rc;
 }
 
@@ -449,36 +370,23 @@ static int32_t cam_sensor_handle_continuous_read(
 }
 
 static int cam_sensor_handle_slave_info(
-	struct camera_io_master *io_master,
-	uint32_t *cmd_buf)
+	uint32_t *cmd_buf,
+	struct i2c_settings_array *i2c_reg_settings,
+	struct list_head **list_ptr)
 {
 	int rc = 0;
 	struct cam_cmd_i2c_info *i2c_info = (struct cam_cmd_i2c_info *)cmd_buf;
+	struct i2c_settings_list  *i2c_list;
 
-	if (io_master == NULL || cmd_buf == NULL) {
-		CAM_ERR(CAM_SENSOR, "Invalid args");
-		return -EINVAL;
+	i2c_list =
+		cam_sensor_get_i2c_ptr(i2c_reg_settings, 1);
+	if (!i2c_list || !i2c_list->i2c_settings.reg_setting) {
+		CAM_ERR(CAM_SENSOR, "Failed in allocating mem for list");
+		return -ENOMEM;
 	}
 
-	switch (io_master->master_type) {
-	case CCI_MASTER:
-		io_master->cci_client->sid = (i2c_info->slave_addr >> 1);
-		io_master->cci_client->i2c_freq_mode = i2c_info->i2c_freq_mode;
-		break;
-
-	case I2C_MASTER:
-		io_master->client->addr = i2c_info->slave_addr;
-		break;
-
-	case SPI_MASTER:
-		break;
-
-	default:
-		CAM_ERR(CAM_SENSOR, "Invalid master type: %d",
-			io_master->master_type);
-		rc = -EINVAL;
-		break;
-	}
+	i2c_list->op_code = CAM_SENSOR_I2C_SET_I2C_INFO;
+	i2c_list->slave_info = *i2c_info;
 
 	return rc;
 }
@@ -698,7 +606,7 @@ int cam_sensor_i2c_command_parser(
 					goto end;
 				}
 				rc = cam_sensor_handle_slave_info(
-					io_master, cmd_buf);
+					cmd_buf, i2c_reg_settings, &list);
 				if (rc) {
 					CAM_ERR(CAM_SENSOR,
 					"Handle slave info failed with rc: %d",
@@ -802,9 +710,12 @@ int cam_sensor_i2c_command_parser(
 			}
 		}
 		i2c_reg_settings->is_settings_valid = 1;
+		cam_mem_put_cpu_buf(cmd_desc[i].mem_handle);
 	}
+	return rc;
 
 end:
+	cam_mem_put_cpu_buf(cmd_desc[i].mem_handle);
 	return rc;
 }
 
@@ -818,7 +729,7 @@ int cam_sensor_util_i2c_apply_setting(
 	switch (i2c_list->op_code) {
 	case CAM_SENSOR_I2C_WRITE_RANDOM: {
 		rc = camera_io_dev_write(io_master_info,
-			&(i2c_list->i2c_settings));
+			&(i2c_list->i2c_settings), false);
 		if (rc < 0) {
 			CAM_ERR(CAM_SENSOR,
 				"Failed to random write I2C settings: %d",
@@ -829,7 +740,8 @@ int cam_sensor_util_i2c_apply_setting(
 	}
 	case CAM_SENSOR_I2C_WRITE_SEQ: {
 		rc = camera_io_dev_write_continuous(
-			io_master_info, &(i2c_list->i2c_settings), 0);
+			io_master_info, &(i2c_list->i2c_settings),
+			0, false);
 		if (rc < 0) {
 			CAM_ERR(CAM_SENSOR,
 				"Failed to seq write I2C settings: %d",
@@ -840,7 +752,8 @@ int cam_sensor_util_i2c_apply_setting(
 	}
 	case CAM_SENSOR_I2C_WRITE_BURST: {
 		rc = camera_io_dev_write_continuous(
-			io_master_info, &(i2c_list->i2c_settings), 1);
+			io_master_info, &(i2c_list->i2c_settings),
+			1, false);
 		if (rc < 0) {
 			CAM_ERR(CAM_SENSOR,
 				"Failed to burst write I2C settings: %d",
@@ -890,6 +803,12 @@ int32_t cam_sensor_i2c_read_data(
 
 	list_for_each_entry(i2c_list,
 		&(i2c_settings->list_head), list) {
+		if (i2c_list->op_code == CAM_SENSOR_I2C_SET_I2C_INFO) {
+			CAM_DBG(CAM_SENSOR,
+				"CAM_SENSOR_I2C_SET_I2C_INFO continue");
+			continue;
+		}
+
 		read_buff = i2c_list->i2c_settings.read_buff;
 		buff_length = i2c_list->i2c_settings.read_buff_len;
 		if ((read_buff == NULL) || (buff_length == 0)) {
@@ -1140,7 +1059,7 @@ int32_t msm_camera_fill_vreg_params(
 			if (j == num_vreg)
 				power_setting[i].seq_val = INVALID_VREG;
 			break;
-		case SENSOR_CUSTOM_REG3://xiaomi add liuqinhong@xiaomi.com start
+		case SENSOR_CUSTOM_REG3:
 			for (j = 0; j < num_vreg; j++) {
 
 				if (!strcmp(soc_info->rgltr_name[j],
@@ -1162,7 +1081,7 @@ int32_t msm_camera_fill_vreg_params(
 			}
 			if (j == num_vreg)
 				power_setting[i].seq_val = INVALID_VREG;
-			break;//xiaomi add liuqinhong@xiaomi.com end
+			break;
 		default:
 			break;
 		}
@@ -2093,7 +2012,7 @@ int cam_sensor_core_power_up(struct cam_sensor_power_ctrl_t *ctrl,
 		case SENSOR_VAF_PWDM:
 		case SENSOR_CUSTOM_REG1:
 		case SENSOR_CUSTOM_REG2:
-		case SENSOR_CUSTOM_REG3://xiaomi add liuqinhong@xiaomi.com
+		case SENSOR_CUSTOM_REG3:
 			if (power_setting->seq_val == INVALID_VREG)
 				break;
 
@@ -2210,7 +2129,7 @@ power_up_failed:
 		case SENSOR_VAF_PWDM:
 		case SENSOR_CUSTOM_REG1:
 		case SENSOR_CUSTOM_REG2:
-		case SENSOR_CUSTOM_REG3://xiaomi add liuqinhong@xiaomi.com
+		case SENSOR_CUSTOM_REG3:
 			if (power_setting->seq_val < num_vreg) {
 				CAM_DBG(CAM_SENSOR, "Disable Regulator");
 				vreg_idx = power_setting->seq_val;
@@ -2379,7 +2298,7 @@ int cam_sensor_util_power_down(struct cam_sensor_power_ctrl_t *ctrl,
 		case SENSOR_VAF_PWDM:
 		case SENSOR_CUSTOM_REG1:
 		case SENSOR_CUSTOM_REG2:
-		case SENSOR_CUSTOM_REG3://xiaomi add liuqinhong@xiaomi.com
+		case SENSOR_CUSTOM_REG3:
 			if (pd->seq_val == INVALID_VREG)
 				break;
 
