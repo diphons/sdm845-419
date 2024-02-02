@@ -2190,8 +2190,9 @@ int msm_vidc_destroy(struct msm_vidc_inst *inst)
 	mutex_destroy(&inst->bufq[CAPTURE_PORT].lock);
 	mutex_destroy(&inst->bufq[OUTPUT_PORT].lock);
 	mutex_destroy(&inst->lock);
-
+#ifdef CONFIG_DEBUG_FS
 	msm_vidc_debugfs_deinit_inst(inst);
+#endif
 
 	pr_info(VIDC_DBG_TAG "Closed video instance: %pK\n",
 			"info", inst);
