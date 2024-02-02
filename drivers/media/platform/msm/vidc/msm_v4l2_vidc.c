@@ -10,8 +10,9 @@
  * GNU General Public License for more details.
  *
  */
-
+#ifdef CONFIG_DEBUG_FS
 #include <linux/debugfs.h>
+#endif
 #include <linux/dma-mapping.h>
 #include <linux/init.h>
 #include <linux/ioctl.h>
@@ -890,16 +891,19 @@ static int __init msm_vidc_init(void)
 
 	INIT_LIST_HEAD(&vidc_driver->cores);
 	mutex_init(&vidc_driver->lock);
+#ifdef CONFIG_DEBUG_FS
 	vidc_driver->debugfs_root = msm_vidc_debugfs_init_drv();
 	if (!vidc_driver->debugfs_root)
 		dprintk(VIDC_ERR,
 			"Failed to create debugfs for msm_vidc\n");
-
+#endif
 	rc = platform_driver_register(&msm_vidc_driver);
 	if (rc) {
 		dprintk(VIDC_ERR,
 			"Failed to register platform driver\n");
+#ifdef CONFIG_DEBUG_FS
 		debugfs_remove_recursive(vidc_driver->debugfs_root);
+#endif
 		kfree(vidc_driver);
 		vidc_driver = NULL;
 	}
