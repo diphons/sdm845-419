@@ -997,7 +997,7 @@ static int fg_awake_cb(struct votable *votable, void *data, int awake,
 	struct fg_dev *fg = data;
 
 	if (awake)
-		pm_stay_awake(fg->dev);
+		pm_wakeup_event(fg->dev, 0);
 	else
 		pm_relax(fg->dev);
 
@@ -2148,7 +2148,7 @@ static enum alarmtimer_restart fg_esr_filter_alarm_cb(struct alarm *alarm,
 	 * We cannot vote for awake votable here as that takes a mutex lock
 	 * and this is executed in an atomic context.
 	 */
-	pm_stay_awake(fg->dev);
+	pm_wakeup_event(fg->dev, 0);
 	schedule_work(&fg->esr_filter_work);
 
 	return ALARMTIMER_NORESTART;
@@ -5590,7 +5590,7 @@ static void soc_work_fn(struct work_struct *work)
 
 	if (temp < 450 && fg->last_batt_temp >= 450) {
 		/* follow the way that fg_notifier_cb use wake lock */
-		pm_stay_awake(fg->dev);
+		pm_wakeup_event(fg->dev, 0);
 		schedule_work(&fg->status_change_work);
 	}
 
@@ -5922,9 +5922,9 @@ static int fg_gen3_probe(struct platform_device *pdev)
 	spin_lock_init(&fg->awake_lock);
 	init_completion(&fg->soc_update);
 	init_completion(&fg->soc_ready);
-	INIT_DELAYED_WORK(&fg->profile_load_work, profile_load_work);
-	INIT_DELAYED_WORK(&fg->soc_monitor_work, soc_monitor_work);
-	INIT_DELAYED_WORK(&chip->pl_enable_work, pl_enable_work);
+	INIT_DEFERRABLE_WORK(&fg->profile_load_work, profile_load_work);
+	INIT_DEFERRABLE_WORK(&fg->soc_monitor_work, soc_monitor_work);
+	INIT_DEFERRABLE_WORK(&chip->pl_enable_work, pl_enable_work);
 	INIT_WORK(&fg->status_change_work, status_change_work);
 	INIT_WORK(&fg->esr_sw_work, fg_esr_sw_work);
 	INIT_DELAYED_WORK(&chip->ttf_work, ttf_work);
@@ -6098,7 +6098,7 @@ static int fg_gen3_resume(struct device *dev)
 				msecs_to_jiffies(fg_sram_dump_period_ms));
 
 	if (!work_pending(&fg->status_change_work)) {
-		pm_stay_awake(fg->dev);
+		pm_wakeup_event(fg->dev, 0);
 		schedule_work(&fg->status_change_work);
 	}
 
