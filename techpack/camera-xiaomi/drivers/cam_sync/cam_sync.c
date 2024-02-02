@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
  */
 
 #include <linux/init.h>
@@ -17,6 +17,7 @@
 #include <synx_api.h>
 #endif
 struct sync_device *sync_dev;
+static struct kmem_cache *kmem_payload_pool;
 
 /*
  * Flag to determine whether to enqueue cb of a
@@ -38,7 +39,7 @@ static void cam_sync_print_fence_table(void)
 			sync_dev->sync_table[idx].name,
 			sync_dev->sync_table[idx].type,
 			sync_dev->sync_table[idx].state,
-			sync_dev->sync_table[idx].ref_cnt);
+			atomic_read(&sync_dev->sync_table[idx].ref_cnt));
 		spin_unlock_bh(&sync_dev->row_spinlocks[idx]);
 	}
 }
@@ -286,6 +287,7 @@ int cam_sync_merge(int32_t *sync_obj, uint32_t num_objs, int32_t *merged_obj)
 	int rc;
 	long idx = 0;
 	bool bit;
+	int i = 0;
 
 	if (!sync_obj || !merged_obj) {
 		CAM_ERR(CAM_SYNC, "Invalid pointer(s)");
@@ -309,6 +311,14 @@ int cam_sync_merge(int32_t *sync_obj, uint32_t num_objs, int32_t *merged_obj)
 		return -EINVAL;
 	}
 
+	for (i = 0; i < num_objs; i++) {
+		rc = cam_sync_check_valid(sync_obj[i]);
+		if (rc) {
+			CAM_ERR(CAM_SYNC, "Sync_obj[%d] %d valid check fail",
+				i, sync_obj[i]);
+			return rc;
+		}
+	}
 	do {
 		idx = find_first_zero_bit(sync_dev->bitmap, CAM_SYNC_MAX_OBJS);
 		if (idx >= CAM_SYNC_MAX_OBJS)
@@ -380,6 +390,30 @@ int cam_sync_destroy(int32_t sync_obj)
 	return cam_sync_deinit_object(sync_dev->sync_table, sync_obj);
 }
 
+int cam_sync_check_valid(int32_t sync_obj)
+{
+	struct sync_table_row *row = NULL;
+
+	if (sync_obj >= CAM_SYNC_MAX_OBJS || sync_obj <= 0)
+		return -EINVAL;
+
+	row = sync_dev->sync_table + sync_obj;
+
+	if (!test_bit(sync_obj, sync_dev->bitmap)) {
+		CAM_ERR(CAM_SYNC, "Error: Released sync obj received %d",
+			sync_obj);
+		return -EINVAL;
+	}
+
+	if (row->state == CAM_SYNC_STATE_INVALID) {
+		CAM_ERR(CAM_SYNC,
+			"Error: accessing an uninitialized sync obj = %d",
+			sync_obj);
+		return -EINVAL;
+	}
+	return 0;
+}
+
 int cam_sync_wait(int32_t sync_obj, uint64_t timeout_ms)
 {
 	unsigned long timeleft;
@@ -442,6 +476,7 @@ static int cam_sync_handle_create(struct cam_private_ioctl_arg *k_ioctl)
 		u64_to_user_ptr(k_ioctl->ioctl_ptr),
 		k_ioctl->size))
 		return -EFAULT;
+	sync_create.name[SYNC_DEBUG_NAME_LEN] = '\0';
 
 	result = cam_sync_create(&sync_create.sync_obj,
 		sync_create.name);
@@ -604,7 +639,7 @@ static int cam_sync_handle_register_user_payload(
 	if (sync_obj >= CAM_SYNC_MAX_OBJS || sync_obj <= 0)
 		return -EINVAL;
 
-	user_payload_kernel = kzalloc(sizeof(*user_payload_kernel), GFP_KERNEL);
+	user_payload_kernel = kmem_cache_zalloc(kmem_payload_pool, GFP_KERNEL);
 	if (!user_payload_kernel)
 		return -ENOMEM;
 
@@ -620,7 +655,7 @@ static int cam_sync_handle_register_user_payload(
 			"Error: accessing an uninitialized sync obj = %d",
 			sync_obj);
 		spin_unlock_bh(&sync_dev->row_spinlocks[sync_obj]);
-		kfree(user_payload_kernel);
+		kmem_cache_free(kmem_payload_pool, user_payload_kernel);
 		return -EINVAL;
 	}
 
@@ -634,7 +669,7 @@ static int cam_sync_handle_register_user_payload(
 			CAM_SYNC_USER_PAYLOAD_SIZE * sizeof(__u64));
 
 		spin_unlock_bh(&sync_dev->row_spinlocks[sync_obj]);
-		kfree(user_payload_kernel);
+		kmem_cache_free(kmem_payload_pool, user_payload_kernel);
 		return 0;
 	}
 
@@ -648,7 +683,7 @@ static int cam_sync_handle_register_user_payload(
 				user_payload_kernel->payload_data[1]) {
 
 			spin_unlock_bh(&sync_dev->row_spinlocks[sync_obj]);
-			kfree(user_payload_kernel);
+			kmem_cache_free(kmem_payload_pool, user_payload_kernel);
 			return -EALREADY;
 		}
 	}
@@ -703,7 +738,7 @@ static int cam_sync_handle_deregister_user_payload(
 				user_payload_kernel->payload_data[1] ==
 				userpayload_info.payload[1]) {
 			list_del_init(&user_payload_kernel->list);
-			kfree(user_payload_kernel);
+			kmem_cache_free(kmem_payload_pool, user_payload_kernel);
 		}
 	}
 
@@ -1138,6 +1173,8 @@ static int __init cam_sync_init(void)
 {
 	int rc;
 
+	kmem_payload_pool = KMEM_CACHE(sync_user_payload, SLAB_HWCACHE_ALIGN | SLAB_PANIC);
+
 	rc = platform_device_register(&cam_sync_device);
 	if (rc)
 		return -ENODEV;
@@ -1154,6 +1191,8 @@ static void __exit cam_sync_exit(void)
 	platform_driver_unregister(&cam_sync_driver);
 	platform_device_unregister(&cam_sync_device);
 	kfree(sync_dev);
+
+	kmem_cache_destroy(kmem_payload_pool);
 }
 
 module_init(cam_sync_init);
