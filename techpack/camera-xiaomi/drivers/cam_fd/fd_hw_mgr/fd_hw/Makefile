@@ -10,7 +10,7 @@ ccflags-y += -I$(srctree)/techpack/camera-xiaomi/drivers/cam_cdm
 ccflags-y += -I$(srctree)/techpack/camera-xiaomi/drivers/cam_fd
 ccflags-y += -I$(srctree)/techpack/camera-xiaomi/drivers/cam_fd/fd_hw_mgr
 ccflags-y += -I$(srctree)/techpack/camera-xiaomi/drivers/cam_fd/fd_hw_mgr/fd_hw
-ccflags-y += -I$(srctree)/techpack/camera-xiaomi
+ccflags-y += -I$(srctree)/techpack/camera
 ccflags-y += -I$(srctree)/techpack/camera-xiaomi/drivers/cam_cpas/include
 
 obj-$(CONFIG_SPECTRA_CAMERA) += cam_fd_hw_dev.o cam_fd_hw_core.o cam_fd_hw_soc.o
