@@ -1590,7 +1590,6 @@ static int cam_ois_pkt_parse(struct cam_ois_ctrl_t *o_ctrl, void *arg)
 		cam_mem_put_cpu_buf(dev_config.packet_handle);
 		return -EINVAL;
 	}
-	cam_mem_put_cpu_buf(dev_config.packet_handle);
 
 	if (!rc) {
 		cam_mem_put_cpu_buf(dev_config.packet_handle);
