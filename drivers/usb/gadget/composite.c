@@ -810,7 +810,11 @@ static int bos_desc(struct usb_composite_dev *cdev)
 	usb_ext->bLength = USB_DT_USB_EXT_CAP_SIZE;
 	usb_ext->bDescriptorType = USB_DT_DEVICE_CAPABILITY;
 	usb_ext->bDevCapabilityType = USB_CAP_TYPE_EXT;
+#ifdef CONFIG_ARCH_KONA
 	usb_ext->bmAttributes = cpu_to_le32(0);
+#else
+	usb_ext->bmAttributes = cpu_to_le32(USB_LPM_SUPPORT | USB_BESL_SUPPORT);
+#endif
 
 	/*
 	 * The Superspeed USB Capability descriptor shall be implemented by all
@@ -1821,12 +1825,21 @@ composite_setup(struct usb_gadget *gadget, const struct usb_ctrlrequest *ctrl)
 					cdev->desc.bcdUSB = cpu_to_le16(0x0320);
 					cdev->desc.bMaxPacketSize0 = 9;
 				} else {
+#ifdef CONFIG_ARCH_KONA
 					cdev->desc.bcdUSB = cpu_to_le16(0x0200);
 				}
 			} else {
 				cdev->desc.bcdUSB = cpu_to_le16(0x0200);
+#else
+					cdev->desc.bcdUSB = cpu_to_le16(0x0210);
+				}
+			} else {
+				if (gadget->lpm_capable)
+					cdev->desc.bcdUSB = cpu_to_le16(0x0201);
+				else
+					cdev->desc.bcdUSB = cpu_to_le16(0x0200);
+#endif
 			}
-
 			value = min(w_length, (u16) sizeof cdev->desc);
 			memcpy(req->buf, &cdev->desc, value);
 			break;
