@@ -93,7 +93,9 @@ struct gadget_info {
 	struct usb_composite_dev cdev;
 	bool use_os_desc;
 	bool unbinding;
+#ifdef CONFIG_ARCH_KONA
 	bool isMSOS;
+#endif
 	char b_vendor_code;
 	char qw_sign[OS_STRING_QW_SIGN_LEN];
 	spinlock_t spinlock;
@@ -151,7 +153,9 @@ struct gadget_config_name {
 };
 
 #define USB_MAX_STRING_WITH_NULL_LEN	(USB_MAX_STRING_LEN+1)
+#ifdef CONFIG_ARCH_KONA
 #define MSOS_VENDOR_TYPE 0x01
+#endif
 
 static int usb_string_copy(const char *s, char **s_copy)
 {
@@ -1504,8 +1508,10 @@ static void android_work(struct work_struct *data)
 					KOBJ_CHANGE, disconnected);
 		pr_info("%s: sent uevent %s\n", __func__, disconnected[0]);
 		uevent_sent = true;
+#ifdef CONFIG_ARCH_KONA
 		gi->isMSOS = false;
 		cdev->isMSOS = false;
+#endif
 	}
 
 	if (!uevent_sent) {
@@ -1645,6 +1651,7 @@ static int android_setup(struct usb_gadget *gadget,
 	int value = -EOPNOTSUPP;
 	struct usb_function_instance *fi;
 
+#ifdef CONFIG_ARCH_KONA
 	if ((c->bRequestType & USB_TYPE_MASK) == USB_TYPE_VENDOR) {
 		if ((c->bRequest == MSOS_VENDOR_TYPE) &&
 			(c->bRequestType & USB_DIR_IN) && le16_to_cpu(c->wIndex == 4)) {
@@ -1652,6 +1659,7 @@ static int android_setup(struct usb_gadget *gadget,
 			cdev->isMSOS = true;
 		}
 	}
+#endif
 	spin_lock_irqsave(&cdev->lock, flags);
 	if (!gi->connected) {
 		gi->connected = 1;
@@ -1786,6 +1794,7 @@ out:
 	return sprintf(buf, "%s\n", state);
 }
 
+#ifdef CONFIG_ARCH_KONA
 static ssize_t isMSOS_show(struct device *pdev, struct device_attribute *attr,
 		char *buf)
 {
@@ -1800,13 +1809,18 @@ static ssize_t isMSOS_show(struct device *pdev, struct device_attribute *attr,
 out:
 	return snprintf(buf, len, "%d\n", isMSOS);
 }
+#endif
 
 static DEVICE_ATTR(state, S_IRUGO, state_show, NULL);
+#ifdef CONFIG_ARCH_KONA
 static DEVICE_ATTR(isMSOS, S_IRUGO, isMSOS_show, NULL);
+#endif
 
 static struct device_attribute *android_usb_attributes[] = {
 	&dev_attr_state,
+#ifdef CONFIG_ARCH_KONA
 	&dev_attr_isMSOS,
+#endif
 	NULL
 };
 
