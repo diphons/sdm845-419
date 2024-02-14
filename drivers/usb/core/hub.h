@@ -71,8 +71,10 @@ struct usb_hub {
 	struct delayed_work	init_work;
 	struct work_struct      events;
 	struct usb_port		**ports;
+#ifdef CONFIG_ARCH_KONA
 	int 			asuspend;
 	int 			addr_number;
+#endif
 };
 
 /**
