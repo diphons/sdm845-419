@@ -36,6 +36,8 @@
 
 #include <trace/events/thermal.h>
 
+#define USE_LMH_DEV    0
+
 /*
  * Cooling state <-> CPUFreq frequency
  *
@@ -126,7 +128,11 @@ static int cpufreq_thermal_notifier(struct notifier_block *nb,
 	unsigned long clipped_freq = ULONG_MAX, floor_freq = 0;
 	struct cpufreq_cooling_device *cpufreq_cdev;
 
+#ifndef CONFIG_BOARD_XIAOMI
+	if (event != CPUFREQ_INCOMPATIBLE)
+#else
 	if (event != CPUFREQ_THERMAL)
+#endif
 		return NOTIFY_DONE;
 
 	mutex_lock(&cooling_list_lock);
@@ -464,9 +470,18 @@ static int cpufreq_set_cur_state(struct thermal_cooling_device *cdev,
 	else
 		cpufreq_update_policy(cpufreq_cdev->policy->cpu);
 #else
-	get_online_cpus();
-	cpufreq_update_policy(cpufreq_cdev->policy->cpu);
-	put_online_cpus();
+	if (USE_LMH_DEV && cpufreq_cdev->plat_ops &&
+		cpufreq_cdev->plat_ops->ceil_limit) {
+		cpufreq_cdev->plat_ops->ceil_limit(cpufreq_cdev->policy->cpu,
+							clip_freq);
+		get_online_cpus();
+		cpufreq_update_policy(cpufreq_cdev->policy->cpu);
+		put_online_cpus();
+	} else {
+		get_online_cpus();
+		cpufreq_update_policy(cpufreq_cdev->policy->cpu);
+		put_online_cpus();
+	}
 #endif
 
 	return 0;
