@@ -30,6 +30,17 @@
 #define CYCLE_CNTR_OFFSET(c, m, acc_count)				\
 			(acc_count ? ((c - cpumask_first(m) + 1) * 4) : 0)
 
+#ifdef CONFIG_ARCH_SDM845
+static DEFINE_PER_CPU(unsigned long, nr_states) = 0;
+
+struct em_state {
+	unsigned long frequency;
+	unsigned long power;
+	unsigned long capacity;
+};
+static DEFINE_PER_CPU(struct em_state*, cpu_em) = NULL;
+#endif
+
 enum {
 	CPUFREQ_HW_LOW_TEMP_LEVEL,
 	CPUFREQ_HW_HIGH_TEMP_LEVEL,
@@ -52,6 +63,32 @@ enum {
 static unsigned int lut_row_size = LUT_ROW_SIZE;
 static unsigned int lut_max_entries = LUT_MAX_ENTRIES;
 static bool accumulative_counter;
+
+#ifdef CONFIG_ARCH_SDM845
+/*
+ * Callback given to the EM framework. All this does is browse the table
+ * created by legacy_em_dt().
+ */
+static int get_power(unsigned long *mW, unsigned long *KHz, int cpu)
+{
+	unsigned long nstates = per_cpu(nr_states, cpu);
+	struct em_state *em = per_cpu(cpu_em, cpu);
+	int i;
+
+	if (!nstates || !em)
+		return -ENODEV;
+
+	for (i = 0; i < nstates - 1; i++) {
+		if (em[i].frequency > *KHz)
+			break;
+	}
+
+	*KHz = em[i].frequency;
+	*mW = em[i].power;
+
+	return 0;
+}
+#endif
 
 struct skipped_freq {
 	bool skip;
@@ -341,7 +378,11 @@ qcom_cpufreq_hw_fast_switch(struct cpufreq_policy *policy,
 
 static int qcom_cpufreq_hw_cpu_init(struct cpufreq_policy *policy)
 {
+#ifdef CONFIG_ARCH_SDM845
+	struct em_data_callback em_cb = EM_DATA_CB(get_power);
+#else
 	struct em_data_callback em_cb = EM_DATA_CB(of_dev_pm_opp_get_cpu_power);
+#endif
 	struct cpufreq_qcom *c;
 	struct device *cpu_dev;
 	int ret;
