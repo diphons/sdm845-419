@@ -10,6 +10,19 @@ fwabs := $(addprefix $(srctree)/,$(filter-out /%,$(fwdir)))$(filter /%,$(fwdir))
 
 fw-external-y := $(subst $(quote),,$(CONFIG_EXTRA_FIRMWARE))
 
+# There are three cases to care about:
+# 1. Building kernel with CONFIG_FIRMWARE_IN_KERNEL=y -- $(fw-shipped-y) should
+#    include the firmware files to include, according to .config
+# 2. 'make modules_install', which will install firmware for modules, and
+#    _also_ for the in-kernel drivers when CONFIG_FIRMWARE_IN_KERNEL=n
+# 3. 'make firmware_install', which installs all firmware, unconditionally.
+
+# For the former two cases we want $(fw-shipped-y) and $(fw-shipped-m) to be
+# accurate. In the latter case it doesn't matter -- it'll use $(fw-shipped-all).
+# But be aware that the config file might not be included at all.
+
+fw-shipped-all := $(fw-shipped-y) $(fw-shipped-m) $(fw-shipped-)
+
 fw-shipped-$(CONFIG_TOUCHSCREEN_NT36XXX_MI845) += novatek_nt36672_e10.fw novatek_nt36672_e10_hw01.fw \
 						novatek_nt36672_e10_hw02.fw
 
@@ -18,6 +31,9 @@ quiet_cmd_ihex  = IHEX    $@
 
 quiet_cmd_ihex2fw  = IHEX2FW $@
       cmd_ihex2fw  = $(objtree)/$(obj)/ihex2fw $< $@
+
+quiet_cmd_h16tofw  = H16TOFW $@
+      cmd_h16tofw  = $(objtree)/$(obj)/ihex2fw -w $< $@
 
 quiet_cmd_fwbin = MK_FW   $@
       cmd_fwbin = FWNAME="$(patsubst firmware/%.gen.S,%,$@)";		     \
@@ -98,11 +114,11 @@ ifeq ($(KBUILD_SRC),)
 _dummy := $(foreach d,$(addprefix $(obj)/,$(dir $(fw-external-y))), $(shell [ -d $(d) ] || mkdir -p $(d)))
 endif
 
-targets := $(patsubst $(obj)/%,%, \
-                                $(shell find $(obj) -name \*.gen.S 2>/dev/null))
+# Remove .S files and binaries created from ihex
+# (during 'make clean' .config isn't included so they're all in $(fw-shipped-))
+targets := $(fw-shipped-) $(patsubst $(obj)/%,%, \
+				$(shell find $(obj) -name \*.gen.S 2>/dev/null))
 
 # Without this, built-in.o won't be created when it's empty, and the
 # final vmlinux link will fail.
 obj- := dummy
-
-hostprogs-y := ihex2fw
