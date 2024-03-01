@@ -650,5 +650,6 @@ source "drivers/power/supply/qcom/Kconfig"
 source "drivers/power/supply/ti/Kconfig"
 source "drivers/power/supply/maxim/Kconfig"
 source "drivers/power/supply/cas_qcom/Kconfig"
+source "drivers/power/supply/qcom_mi845/Kconfig"
 
 endif # POWER_SUPPLY
