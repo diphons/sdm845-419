@@ -1,0 +1,37 @@
+# SPDX-License-Identifier: GPL-2.0-only
+
+menu "Qualcomm Technologies, Inc. Charger and Fuel Gauge support"
+
+config QPNP_SMB2_SDM845
+        tristate "SMB2 Battery Charger"
+        depends on MFD_SPMI_PMIC
+        help
+          Say Y to enables support for the SMB2 charging peripheral.
+          The QPNP SMB2 charger driver supports the charger peripheral
+          present in the PMICOBALT chip.
+          The power supply framework is used to communicate battery and
+          usb properties to userspace and other driver consumers such
+          as fuel gauge, USB, and USB-PD.
+          VBUS and VCONN regulators are registered for supporting OTG,
+          and powered Type-C cables respectively.
+
+config SMB1355_SLAVE_CHARGER_SDM845
+	tristate "SMB1355 Slave Battery Charger"
+	depends on MFD_I2C_PMIC
+	help
+	  Say Y to include support for SMB1355 Battery Charger.
+	  SMB1355 is a single phase 5A battery charger.
+	  The driver supports charger enable/disable.
+	  The driver reports the charger status via the power supply framework.
+	  A charger status change triggers an IRQ via the device STAT pin.
+
+config QPNP_FG_GEN3_SDM845
+        tristate "QPNP GEN3 fuel gauge driver"
+        depends on MFD_SPMI_PMIC
+        help
+          Say Y here to enable the GEN3 Fuel Gauge driver. This adds support
+          for battery fuel gauging and state of charge of battery connected to
+          the fuel gauge. The state of charge is reported through a BMS power
+          supply property and also sends uevents when the capacity is updated.
+
+endmenu
