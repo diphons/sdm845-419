@@ -1373,11 +1373,7 @@ headers_install: __headers
 	  $(error Headers not exportable for the $(SRCARCH) architecture))
 	$(Q)$(MAKE) $(hdr-inst)=include/uapi dst=include
 	$(Q)$(MAKE) $(hdr-inst)=arch/$(SRCARCH)/include/uapi $(hdr-dst)
-ifdef CONFIG_ARCH_SDM845
-	$(Q)$(MAKE) $(hdr-inst)=techpack/audio_sdm845/include/uapi dst=techpack/audio_sdm845/include
-else
 	$(Q)$(MAKE) $(hdr-inst)=techpack/audio/include/uapi dst=techpack/audio/include
-endif
 
 PHONY += headers_check_all
 headers_check_all: headers_install_all
