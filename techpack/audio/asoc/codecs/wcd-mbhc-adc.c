@@ -579,18 +579,18 @@ static void wcd_mbhc_adc_update_fsm_source(struct wcd_mbhc *mbhc,
 #endif
 	switch (plug_type) {
 	case MBHC_PLUG_TYPE_HEADPHONE:
+		WCD_MBHC_REG_UPDATE_BITS(WCD_MBHC_BTN_ISRC_CTL, 3);
+		break;
+	case MBHC_PLUG_TYPE_HEADSET:
+	case MBHC_PLUG_TYPE_ANC_HEADPHONE:
 #ifdef CONFIG_ARCH_SDM845
 		WCD_MBHC_REG_UPDATE_BITS(WCD_MBHC_BTN_ISRC_CTL, 0);
 		mbhc->mbhc_cb->mbhc_micbias_control(mbhc->component,
 				MIC_BIAS_2, MICB_PULLUP_ENABLE);
 #else
-		WCD_MBHC_REG_UPDATE_BITS(WCD_MBHC_BTN_ISRC_CTL, 3);
-#endif
-		break;
-	case MBHC_PLUG_TYPE_HEADSET:
-	case MBHC_PLUG_TYPE_ANC_HEADPHONE:
 		if (!mbhc->is_hs_recording && !micbias2)
 			WCD_MBHC_REG_UPDATE_BITS(WCD_MBHC_BTN_ISRC_CTL, 3);
+#endif
 		break;
 	default:
 		WCD_MBHC_REG_UPDATE_BITS(WCD_MBHC_BTN_ISRC_CTL, 0);
