@@ -306,6 +306,9 @@ static void lsm_event_handler(uint32_t opcode, uint32_t token,
 			dev_err(rtd->dev,
 					"%s: client_size has invalid size[%d]\n",
 					__func__, client_size);
+#ifdef CONFIG_ARCH_SDM845
+			__pm_relax(prtd->ws);
+#endif
 			return;
 		}
 		status = (uint16_t)((uint8_t *)payload)[0];
@@ -2702,8 +2705,7 @@ done:
 	return err;
 }
 
-st
-	prtd->ws = wakeup_source_register(rtd->dev, "lsm-client");bstream *substream)
+static int msm_lsm_open(struct snd_pcm_substream *substream)
 {
 	struct snd_pcm_runtime *runtime = substream->runtime;
 	struct lsm_priv *prtd;
