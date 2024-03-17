@@ -55,7 +55,12 @@ static bool bc12_compliance;
 module_param(bc12_compliance, bool, 0644);
 MODULE_PARM_DESC(bc12_compliance, "Disable sending dp pulse for CDP");
 
+#ifdef CONFIG_ARCH_KONA
+#define SDP_CONNETION_CHECK_TIME 10000 /* in ms */
+#else
 #define SDP_CONNETION_CHECK_TIME 5000 /* in ms */
+#define EXTCON_SYNC_EVENT_TIMEOUT_MS 1500 /* in ms */
+#endif
 
 /* time out to wait for USB cable status notification (in ms)*/
 #define SM_INIT_TIMEOUT 30000
@@ -305,7 +310,9 @@ struct dwc3_msm {
 	struct workqueue_struct *dwc3_wq;
 	struct workqueue_struct *sm_usb_wq;
 	struct delayed_work	sm_work;
+#ifdef CONFIG_ARCH_KONA
 	struct delayed_work	rst_work;
+#endif
 	unsigned long		inputs;
 	unsigned int		max_power;
 	bool			charging_disabled;
@@ -386,10 +393,15 @@ static void dwc3_pwr_event_handler(struct dwc3_msm *mdwc);
 static int dwc3_msm_gadget_vbus_draw(struct dwc3_msm *mdwc, unsigned int mA);
 static void dwc3_msm_notify_event(struct dwc3 *dwc, unsigned int event,
 						unsigned int value);
+#ifdef CONFIG_ARCH_KONA
 static int dwc3_usb_blocking_sync(struct notifier_block *nb,
 					unsigned long event, void *ptr);
 static int dwc3_otg_start_host(struct dwc3_msm *mdwc, int on);
 static struct delayed_work *rst_work;
+#else
+static int dwc3_usb_blocking_sync(struct notifier_block *nb,
+					unsigned long host_enable_event, void *ptr);
+#endif
 
 /**
  *
@@ -512,6 +524,7 @@ static inline bool dwc3_msm_is_dev_superspeed(struct dwc3_msm *mdwc)
 
 static inline bool dwc3_msm_is_superspeed(struct dwc3_msm *mdwc)
 {
+#ifdef CONFIG_ARCH_KONA
 	int ret = 0;
 	if(!mdwc) {
 		pr_err("the data is null \n");
@@ -526,6 +539,12 @@ static inline bool dwc3_msm_is_superspeed(struct dwc3_msm *mdwc)
 	}
 
 	return ret;
+#else
+	if (mdwc->in_host_mode)
+		return dwc3_msm_is_host_superspeed(mdwc);
+
+	return dwc3_msm_is_dev_superspeed(mdwc);
+#endif
 }
 
 static int dwc3_msm_dbm_disable_updxfer(struct dwc3 *dwc, u8 usb_ep)
@@ -3362,8 +3381,10 @@ static void check_for_sdp_connection(struct work_struct *w)
 	struct dwc3_msm *mdwc =
 		container_of(w, struct dwc3_msm, sdp_check.work);
 	struct dwc3 *dwc = platform_get_drvdata(mdwc->dwc3);
+#ifndef CONFIG_ARCH_KONA
 	union power_supply_propval pval = {0};
 	int ret;
+#endif
 
 	if (!mdwc->vbus_active)
 		return;
@@ -3379,6 +3400,7 @@ static void check_for_sdp_connection(struct work_struct *w)
 	if (dwc->gadget.state < USB_STATE_DEFAULT &&
 		dwc3_gadget_get_link_state(dwc) != DWC3_LINK_STATE_CMPLY) {
 		mdwc->vbus_active = 0;
+#ifndef CONFIG_ARCH_KONA
 		if (!mdwc->usb_psy)
 			mdwc->usb_psy = power_supply_get_by_name("usb");
 		if (mdwc->usb_psy) {
@@ -3388,6 +3410,7 @@ static void check_for_sdp_connection(struct work_struct *w)
 			if (ret)
 				dev_dbg(mdwc->dev, "error when set property\n");
 		}
+#endif
 		dbg_event(0xFF, "Q RW SPD CHK", mdwc->vbus_active);
 		queue_work(mdwc->dwc3_wq, &mdwc->resume_work);
 	}
@@ -3641,6 +3664,7 @@ static ssize_t speed_store(struct device *dev, struct device_attribute *attr,
 }
 static DEVICE_ATTR_RW(speed);
 
+#ifdef CONFIG_ARCH_KONA
 static ssize_t super_speed_show(struct device *dev,
 				struct device_attribute *attr,
 				char *buf)
@@ -3660,6 +3684,7 @@ static ssize_t super_speed_store(struct device *dev,
 	return 0;
 }
 static DEVICE_ATTR_RW(super_speed);
+#endif
 
 static ssize_t usb_compliance_mode_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
@@ -3769,6 +3794,7 @@ static int dwc_dpdm_cb(struct notifier_block *nb, unsigned long evt, void *p)
 	return NOTIFY_OK;
 }
 
+#ifdef CONFIG_ARCH_KONA
 void usb_reset_host(void)
 {
 	struct dwc3_msm *mdwc = container_of(rst_work, struct dwc3_msm, rst_work);
@@ -3808,6 +3834,7 @@ static void usb_reset_work(struct work_struct *w)
 		}
 	}
 }
+#endif
 
 static ssize_t usb_data_enabled_show(struct device *dev,
 				     struct device_attribute *attr, char *buf)
@@ -4092,11 +4119,13 @@ static int dwc3_msm_probe(struct platform_device *pdev)
 		if (mdwc->default_bus_vote >=
 				mdwc->bus_scale_table->num_usecases)
 			mdwc->default_bus_vote = BUS_VOTE_NOMINAL;
+#ifdef CONFIG_ARCH_KONA
 		if (strstr(mdwc->bus_scale_table->name, "usb1")) {
 			dev_dbg(&pdev->dev, "%s: USB1 Init RST workqueue!\n", __func__);
 			INIT_DELAYED_WORK(&mdwc->rst_work, usb_reset_work);
 			rst_work = &mdwc->rst_work;
 		}
+#endif
 	}
 
 	dwc = platform_get_drvdata(mdwc->dwc3);
@@ -4220,7 +4249,9 @@ static int dwc3_msm_probe(struct platform_device *pdev)
 	device_create_file(&pdev->dev, &dev_attr_orientation);
 	device_create_file(&pdev->dev, &dev_attr_mode);
 	device_create_file(&pdev->dev, &dev_attr_speed);
+#ifdef CONFIG_ARCH_KONA
 	device_create_file(&pdev->dev, &dev_attr_super_speed);
+#endif
 	device_create_file(&pdev->dev, &dev_attr_usb_compliance_mode);
 	device_create_file(&pdev->dev, &dev_attr_bus_vote);
 	device_create_file(&pdev->dev, &dev_attr_usb_data_enabled);
@@ -4686,15 +4717,25 @@ static int dwc3_otg_start_peripheral(struct dwc3_msm *mdwc, int on)
 	return 0;
 }
 
+#ifdef CONFIG_ARCH_KONA
 static int dwc3_usb_blocking_sync(struct notifier_block *nb,
 				unsigned long event, void *ptr)
+#else
+static int dwc3_usb_blocking_sync(struct notifier_block *nb,
+				unsigned long host_enable_event, void *ptr)
+#endif
 {
 	struct dwc3 *dwc;
 	struct extcon_dev *edev = ptr;
 	struct extcon_nb *enb = container_of(nb, struct extcon_nb,
 						blocking_sync_nb);
 	struct dwc3_msm *mdwc = enb->mdwc;
+#ifdef CONFIG_ARCH_KONA
 	int ret = 0;
+#else
+	unsigned long timeout_ms = jiffies +
+			msecs_to_jiffies(EXTCON_SYNC_EVENT_TIMEOUT_MS);
+#endif
 
 	if (!edev || !mdwc)
 		return NOTIFY_DONE;
@@ -4702,6 +4743,7 @@ static int dwc3_usb_blocking_sync(struct notifier_block *nb,
 	dwc = platform_get_drvdata(mdwc->dwc3);
 
 	dbg_event(0xFF, "fw_blocksync", 0);
+#ifdef CONFIG_ARCH_KONA
 	flush_work(&mdwc->resume_work);
 	drain_workqueue(mdwc->sm_usb_wq);
 
@@ -4727,6 +4769,19 @@ static int dwc3_usb_blocking_sync(struct notifier_block *nb,
 	}
 
 	return ret;
+#else
+	do {
+		if (mdwc->drd_state == (host_enable_event ? DRD_STATE_HOST
+					: DRD_STATE_IDLE))
+			break;
+		msleep(50);
+	} while (time_before(jiffies, timeout_ms));
+
+	if (!time_before(jiffies, timeout_ms))
+		dev_err(mdwc->dev, "TIMEOUT when changing the state\n");
+
+	return 0;
+#endif
 }
 
 static int get_psy_type(struct dwc3_msm *mdwc)
@@ -4773,10 +4828,14 @@ static int dwc3_msm_gadget_vbus_draw(struct dwc3_msm *mdwc, unsigned int mA)
 		goto set_prop;
 	}
 
+#ifdef CONFIG_ARCH_KONA
+	if (mdwc->max_power == mA || psy_type != POWER_SUPPLY_TYPE_USB)
+#else
 	if (mdwc->max_power == mA
 			|| (psy_type == POWER_SUPPLY_TYPE_USB_CDP)
 			|| ((psy_type != POWER_SUPPLY_TYPE_USB)
 				&& (mA != ENUMERATE_MA)))
+#endif
 		return 0;
 
 	/* Set max current limit in uA */
@@ -4951,7 +5010,9 @@ static void dwc3_otg_sm_work(struct work_struct *w)
 			mdwc->vbus_retry_count = 0;
 			work = 1;
 		} else {
+#ifdef CONFIG_ARCH_KONA
 			mdwc->drd_state = DRD_STATE_HOST;
+#endif
 
 			ret = dwc3_otg_start_host(mdwc, 1);
 			if ((ret == -EPROBE_DEFER) &&
@@ -4960,15 +5021,23 @@ static void dwc3_otg_sm_work(struct work_struct *w)
 				 * Get regulator failed as regulator driver is
 				 * not up yet. Will try to start host after 1sec
 				 */
+#ifdef CONFIG_ARCH_KONA
 				mdwc->drd_state = DRD_STATE_HOST_IDLE;
+#endif
 				dev_dbg(mdwc->dev, "Unable to get vbus regulator. Retrying...\n");
 				delay = VBUS_REG_CHECK_DELAY;
 				work = 1;
 				mdwc->vbus_retry_count++;
 			} else if (ret) {
 				dev_err(mdwc->dev, "unable to start host\n");
+#ifdef CONFIG_ARCH_KONA
 				mdwc->drd_state = DRD_STATE_HOST_IDLE;
+#endif
 				goto ret;
+#ifndef CONFIG_ARCH_KONA
+			} else {
+				mdwc->drd_state = DRD_STATE_HOST;
+#endif
 			}
 		}
 		break;
