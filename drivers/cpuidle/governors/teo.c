@@ -227,6 +227,13 @@ static void teo_update(struct cpuidle_driver *drv, struct cpuidle_device *dev)
 		}
 	}
 
+	i = cpu_data->next_recent_idx++;
+	if (cpu_data->next_recent_idx >= NR_RECENT)
+		cpu_data->next_recent_idx = 0;
+
+	if (cpu_data->recent_idx[i] >= 0)
+		cpu_data->state_bins[cpu_data->recent_idx[i]].recent--;
+
 	/*
 	 * If the deepest state's target residency is below the tick length,
 	 * make a record of it to help teo_select() decide whether or not
