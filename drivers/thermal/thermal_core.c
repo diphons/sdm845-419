@@ -502,11 +502,9 @@ static void thermal_zone_device_init(struct thermal_zone_device *tz)
 {
 	struct thermal_instance *pos;
 
-#ifdef CONFIG_ARCH_KONA
 	if (tz->tzp && tz->tzp->tracks_low)
 		tz->temperature = THERMAL_TEMP_INVALID_LOW;
 	else
-#endif
 		tz->temperature = THERMAL_TEMP_INVALID;
 
 	tz->prev_low_trip = -INT_MAX;
