@@ -43,9 +43,9 @@
 /*****************************************/
 
 char list_wl[LENGTH_LIST_WL] = {0};
-char list_wl_default[LENGTH_LIST_WL_DEFAULT] = {0};
+char list_wl_default[3053] = {0};
 
-extern char list_wl_search[LENGTH_LIST_WL_SEARCH];
+extern char list_wl_search[4096];
 extern bool wl_blocker_active;
 extern bool wl_blocker_debug;
 

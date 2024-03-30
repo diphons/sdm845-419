@@ -2297,14 +2297,14 @@ static inline void set_wake_up_idle(bool enabled)
 		current->flags &= ~PF_WAKE_UP_IDLE;
 }
 
-extern inline bool is_critical_task(struct task_struct *p);
+extern bool is_critical_task(struct task_struct *p);
 
-extern inline bool is_top_app(struct task_struct *p);
+extern bool is_top_app(struct task_struct *p);
 
-extern inline bool is_inherit_top_app(struct task_struct *p);
+extern bool is_inherit_top_app(struct task_struct *p);
 
 #define INHERIT_DEPTH 2
-extern inline void set_inherit_top_app(struct task_struct *p,
+extern void set_inherit_top_app(struct task_struct *p,
 					struct task_struct *from);
-extern inline void restore_inherit_top_app(struct task_struct *p);
+extern void restore_inherit_top_app(struct task_struct *p);
 #endif
