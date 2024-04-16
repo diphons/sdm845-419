@@ -7155,6 +7155,11 @@ static void find_best_target(struct sched_domain *sd, cpumask_t *cpus,
 			if (fbt_env->skip_cpu == i)
 				continue;
 
+#ifdef CONFIG_PERF_HUMANTASK
+			if (p->human_task > MAX_LEVER)
+				break;
+#endif
+
 			if (sched_boost_top_app() && rd->mid_cap_orig_cpu != -1 &&
 				((i < rd->mid_cap_orig_cpu && MAX_USER_RT_PRIO <= p->prio &&
 				p->prio < DEFAULT_PRIO) ||
@@ -7936,6 +7941,11 @@ static int find_energy_efficient_cpu(struct task_struct *p, int prev_cpu,
 		goto done;
 	}
 
+#ifdef CONFIG_PERF_HUMANTASK
+	if (p->human_task > MAX_LEVER)
+		goto done;
+#endif
+
 	rcu_read_lock();
 	pd = rcu_dereference(rd->pd);
 	if (!pd)
@@ -8058,9 +8068,6 @@ done:
 			sync, fbt_env.need_idle, fbt_env.fastpath,
 			placement_boost, start_t, boosted, is_rtg,
 			get_rtg_status(p), start_cpu);
-#ifdef CONFIG_PERF_HUMANTASK
-	p->cpux = best_energy_cpu;
-#endif
 
 	return best_energy_cpu;
 
@@ -9111,6 +9118,11 @@ redo:
 			env->flags |= LBF_NEED_BREAK;
 			break;
 		}
+
+#ifdef CONFIG_PERF_HUMANTASK
+		if (p->human_task > MAX_LEVER)
+			goto next;
+#endif
 
 		if (sched_boost_top_app() &&
 				super_big_cpu == env->src_cpu &&
