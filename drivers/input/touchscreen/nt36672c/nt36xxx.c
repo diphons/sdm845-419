@@ -1803,8 +1803,6 @@ static int nvt_palm_sensor_write(int value)
 	return ret;
 }
 
-
-static struct xiaomi_touch_interface xiaomi_touch_interfaces;
 static void nvt_init_touchmode_data(void)
 {
 	int i;
@@ -3040,6 +3038,9 @@ static int32_t nvt_ts_suspend(struct device *dev)
 	uint32_t i = 0;
 #endif
 	int ret = 0;
+#ifdef CONFIG_TOUCHSCREEN_XIAOMI_TOUCHFEATURE
+	struct xiaomi_touch_pdata *pdata;
+#endif
 	if (!bTouchIsAwake) {
 		NVT_LOG("Touch is already suspend\n");
 		return 0;
@@ -3068,6 +3069,13 @@ static int32_t nvt_ts_suspend(struct device *dev)
 		nvt_set_pocket_palm_switch(false);
 		ts->palm_sensor_switch = false;
 		ts->palm_sensor_changed = true;
+	}
+	pdata = dev_get_drvdata(get_xiaomi_touch_dev());
+	if (pdata->bump_sample_rate) {
+		pr_info("%s: bump_sample_rate is true, resetting mode\n",
+			__func__);
+		pdata->set_update = false;
+		xiaomi_touch_interfaces.resetMode(0);
 	}
 #endif
 	mdelay(10);
@@ -3133,6 +3141,9 @@ return:
 static int32_t nvt_ts_resume(struct device *dev)
 {
 	int ret;
+#ifdef CONFIG_TOUCHSCREEN_XIAOMI_TOUCHFEATURE
+	struct xiaomi_touch_pdata *pdata;
+#endif
 	if (ts->dev_pm_suspend)
 		pm_stay_awake(dev);
 	if (!ts->db_wakeup) {
@@ -3198,6 +3209,19 @@ static int32_t nvt_ts_resume(struct device *dev)
 		NVT_LOG("palm sensor on status, switch to on\n");
 		nvt_set_pocket_palm_switch(true);
 		ts->palm_sensor_changed = true;
+	}
+	pdata = dev_get_drvdata(get_xiaomi_touch_dev());
+	if (pdata->bump_sample_rate) {
+		pr_info("%s: bump_sample_rate is true, re-enabling it\n",
+			__func__);
+		pdata->set_update = true;
+		xiaomi_touch_interfaces.setModeValue(0, 1);
+		xiaomi_touch_interfaces.setModeValue(1, 1);
+		xiaomi_touch_interfaces.setModeValue(3, 5);
+		xiaomi_touch_interfaces.setModeValue(2, 99);
+		xiaomi_touch_interfaces.setModeValue(7, 0);
+	} else {
+		pr_info("%s: bump_sample_rate is false\n", __func__);
 	}
 #endif
 	mutex_unlock(&ts->lock);

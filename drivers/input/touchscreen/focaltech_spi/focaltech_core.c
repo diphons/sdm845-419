@@ -1806,10 +1806,17 @@ static int fts_ts_remove_entry(struct fts_ts_data *ts_data)
 	return 0;
 }
 
+#ifdef CONFIG_TOUCHSCREEN_XIAOMI_TOUCHFEATURE
+static struct xiaomi_touch_interface xiaomi_touch_interfaces;
+#endif
+
 static int fts_ts_suspend(struct device *dev)
 {
 	int ret = 0;
 	struct fts_ts_data *ts_data = fts_data;
+#ifdef CONFIG_TOUCHSCREEN_XIAOMI_TOUCHFEATURE
+	struct xiaomi_touch_pdata *pdata;
+#endif
 
 	FTS_FUNC_ENTER();
 	if (ts_data->suspended) {
@@ -1827,6 +1834,13 @@ static int fts_ts_suspend(struct device *dev)
 		FTS_INFO("palm sensor ON, switch to OFF");
 		update_palm_sensor_value(0);
 		fts_palm_sensor_cmd(0);
+	}
+	pdata = dev_get_drvdata(get_xiaomi_touch_dev());
+	if (pdata->bump_sample_rate) {
+		pr_info("%s: bump_sample_rate is true, resetting mode\n",
+			__func__);
+		pdata->set_update = false;
+		xiaomi_touch_interfaces.resetMode(0);
 	}
 #endif
 
@@ -1863,6 +1877,9 @@ static int fts_ts_suspend(struct device *dev)
 static int fts_ts_resume(struct device *dev)
 {
 	struct fts_ts_data *ts_data = fts_data;
+#ifdef CONFIG_TOUCHSCREEN_XIAOMI_TOUCHFEATURE
+	struct xiaomi_touch_pdata *pdata;
+#endif
 
 	FTS_FUNC_ENTER();
 	if (!ts_data->suspended) {
@@ -1890,6 +1907,19 @@ static int fts_ts_resume(struct device *dev)
 	if (ts_data->palm_sensor_switch) {
 		FTS_INFO("palm sensor OFF, switch to ON");
 		fts_palm_sensor_cmd(1);
+	}
+	pdata = dev_get_drvdata(get_xiaomi_touch_dev());
+	if (pdata->bump_sample_rate) {
+		pr_info("%s: bump_sample_rate is true, re-enabling it\n",
+			__func__);
+		pdata->set_update = true;
+		xiaomi_touch_interfaces.setModeValue(0, 1);
+		xiaomi_touch_interfaces.setModeValue(1, 1);
+		xiaomi_touch_interfaces.setModeValue(3, 34);
+		xiaomi_touch_interfaces.setModeValue(2, 99);
+		xiaomi_touch_interfaces.setModeValue(7, 0);
+	} else {
+		pr_info("%s: bump_sample_rate is false\n", __func__);
 	}
 #endif
 
@@ -1949,8 +1979,6 @@ void fts_update_gesture_state(struct fts_ts_data *ts_data, int bit, bool enable)
 }
 
 #ifdef CONFIG_TOUCHSCREEN_XIAOMI_TOUCHFEATURE
-static struct xiaomi_touch_interface xiaomi_touch_interfaces;
-
 static void fts_read_palm_data(u8 reg_value)
 {
 	if (reg_value == 0x40)

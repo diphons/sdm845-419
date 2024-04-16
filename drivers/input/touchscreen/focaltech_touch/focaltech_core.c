@@ -1195,7 +1195,7 @@ err_irq_gpio_req:
 
 #ifdef CONFIG_TOUCHSCREEN_XIAOMI_TOUCHFEATURE
 static struct xiaomi_touch_interface xiaomi_touch_interfaces;
-#ifdef CONFIG_TOUCHSCREEN_XIAOMI_TOUCHFEATURE
+
 static int fts_read_palm_data(void)
 {
 	int ret;
@@ -1257,9 +1257,7 @@ static int fts_palm_sensor_write(int value)
 	FTS_FUNC_EXIT();
 	return ret;
 }
-#endif
 
-#ifdef CONFIG_TOUCHSCREEN_XIAOMI_TOUCHFEATURE
 static void fts_init_touchmode_data(void)
 {
 	int i;
@@ -1523,7 +1521,6 @@ static int fts_reset_mode(int mode)
 
 	return 0;
 }
-#endif
 #endif
 
 /*****************************************************************************
@@ -2530,6 +2527,9 @@ static int fts_ts_suspend(struct device *dev)
 {
 	int ret = 0;
 	struct fts_ts_data *ts_data = dev_get_drvdata(dev);
+#ifdef CONFIG_TOUCHSCREEN_XIAOMI_TOUCHFEATURE
+	struct xiaomi_touch_pdata *pdata;
+#endif
 
 #ifdef CONFIG_TOUCHSCREEN_FTS_FOD
 	mutex_lock(&ts_data->fod_mutex);
@@ -2551,16 +2551,21 @@ static int fts_ts_suspend(struct device *dev)
 		return 0;
 	}
 
-/*
 #ifdef CONFIG_TOUCHSCREEN_XIAOMI_TOUCHFEATURE
-	if (ts_data->palm_sensor_switch) {
+/*	if (ts_data->palm_sensor_switch) {
 		update_palm_sensor_value(0);
 		fts_palm_enable(ts_data, 1);
 		fts_data->palm_sensor_switch = false;
 		ts_data->palm_sensor_changed = true;
+	}*/
+	pdata = dev_get_drvdata(get_xiaomi_touch_dev());
+	if (pdata->bump_sample_rate) {
+		pr_info("%s: bump_sample_rate is true, resetting mode\n",
+			__func__);
+		pdata->set_update = false;
+		xiaomi_touch_interfaces.resetMode(0);
 	}
 #endif
-*/
 #if FTS_ESDCHECK_EN
 	fts_esdcheck_suspend();
 #endif
@@ -2648,6 +2653,9 @@ release_finger:
 static int fts_ts_resume(struct device *dev)
 {
 	struct fts_ts_data *ts_data = dev_get_drvdata(dev);
+#ifdef CONFIG_TOUCHSCREEN_XIAOMI_TOUCHFEATURE
+	struct xiaomi_touch_pdata *pdata;
+#endif
 
 	FTS_FUNC_ENTER();
 
@@ -2699,6 +2707,19 @@ static int fts_ts_resume(struct device *dev)
 	if (ts_data->palm_sensor_switch) {
 		fts_palm_enable(ts_data, 1);
 		ts_data->palm_sensor_changed = true;
+	}
+	pdata = dev_get_drvdata(get_xiaomi_touch_dev());
+	if (pdata->bump_sample_rate) {
+		pr_info("%s: bump_sample_rate is true, re-enabling it\n",
+			__func__);
+		pdata->set_update = true;
+		xiaomi_touch_interfaces.setModeValue(0, 1);
+		xiaomi_touch_interfaces.setModeValue(1, 1);
+		xiaomi_touch_interfaces.setModeValue(3, 34);
+		xiaomi_touch_interfaces.setModeValue(2, 99);
+		xiaomi_touch_interfaces.setModeValue(7, 0);
+	} else {
+		pr_info("%s: bump_sample_rate is false\n", __func__);
 	}
 #endif
 		return 0;
