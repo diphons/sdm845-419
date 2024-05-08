@@ -24,9 +24,11 @@
 #include "qdf_trace.h"
 #include "qdf_types.h"
 
+#ifndef CONFIG_ARCH_SDM845
 #include "wlan_hdd_misc.h"
 
 static char *wlan_cfg_buf;
+#endif
 
 QDF_STATUS qdf_ini_parse(const char *ini_path, void *context,
 			 qdf_ini_item_cb item_cb, qdf_ini_section_cb section_cb)
@@ -36,17 +38,22 @@ QDF_STATUS qdf_ini_parse(const char *ini_path, void *context,
 	char *cursor;
 	int ini_read_count = 0;
 
+#ifndef CONFIG_ARCH_SDM845
 	if (strcmp(ini_path, WLAN_INI_FILE) == 0) {
 		pr_info("qcacld: loading overridden WLAN_INI_FILE\n");
 		fbuf = wlan_cfg_buf;
 		status = QDF_STATUS_SUCCESS;
 	} else {
+#else
 		status = qdf_file_read(ini_path, &fbuf);
 		if (QDF_IS_STATUS_ERROR(status)) {
 			qdf_err("Failed to read *.ini file @ %s", ini_path);
 			return status;
 		}
+#endif
+#ifndef CONFIG_ARCH_SDM845
 	}
+#endif
 
 	/* foreach line */
 	cursor = fbuf;
@@ -100,7 +107,9 @@ QDF_STATUS qdf_ini_parse(const char *ini_path, void *context,
 
 		key = qdf_str_trim(key);
 
+#ifndef CONFIG_ARCH_SDM845
 		pr_info("qcacld: cfg: \"%s\" = \"%s\"\n", key, value);
+#endif
 
 		/*
 		 * Ignoring comments, a valid ini line contains one of:
@@ -147,6 +156,7 @@ free_fbuf:
 }
 qdf_export_symbol(qdf_ini_parse);
 
+#ifndef CONFIG_ARCH_SDM845
 static int __init wlan_copy_ini_buf(void)
 {
 	#include "wlan_cfg_ini.h"
@@ -158,4 +168,4 @@ static int __init wlan_copy_ini_buf(void)
 }
 
 module_init(wlan_copy_ini_buf);
-
+#endif
