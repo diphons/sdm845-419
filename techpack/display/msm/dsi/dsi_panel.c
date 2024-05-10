@@ -43,6 +43,9 @@
 
 extern struct frame_stat fm_stat;
 extern void sde_crtc_fod_ui_ready(struct dsi_display *display, int type, int value);
+#ifdef CONFIG_D8G_SERVICE
+static int oprofile_last = -1; // get last profile by oprofile
+#endif
 
 enum dsi_dsc_ratio_type {
 	DSC_8BPC_8BPP,
@@ -4679,6 +4682,8 @@ int dsi_panel_set_lp1(struct dsi_panel *panel)
 			"ibb", REGULATOR_MODE_IDLE);
 #ifdef CONFIG_D8G_SERVICE
 	oplus_panel_status = 3; // DISPLAY_POWER_DOZE
+	oprofile_last = oprofile; // Get latest profile
+	oprofile = 4; // set oprofile to battery when display off
 #endif
 	rc = dsi_panel_tx_cmd_set(panel, DSI_CMD_SET_LP1);
 	if (rc)
@@ -4717,6 +4722,8 @@ int dsi_panel_set_lp2(struct dsi_panel *panel)
 
 #ifdef CONFIG_D8G_SERVICE
 	oplus_panel_status = 4; // DISPLAY_POWER_DOZE_SUSPEND
+	oprofile_last = oprofile; // Get latest profile
+	oprofile = 4; // set oprofile to battery when display off
 #endif
 	rc = dsi_panel_tx_cmd_set(panel, DSI_CMD_SET_LP2);
 	if (rc)
@@ -4796,6 +4803,9 @@ exit_skip:
 
 #ifdef CONFIG_D8G_SERVICE
 	oplus_panel_status = 2; // DISPLAY_POWER_ON
+	if (oprofile_last < 0) 
+		oprofile_last = oprofile;
+	oprofile = oprofile_last; // set oprofile to last profile setted
 #endif
 
 exit:
@@ -5223,10 +5233,11 @@ int dsi_panel_enable(struct dsi_panel *panel)
 	mi_cfg->cabc_current_status = 0;
 	fm_stat.idle_status = false;
 
-
-
 #ifdef CONFIG_D8G_SERVICE
 	oplus_panel_status = 2; // DISPLAY_POWER_ON
+	if (oprofile_last < 0) 
+		oprofile_last = oprofile;
+	oprofile = oprofile_last; // set oprofile to last profile setted
 #endif
 
 	mutex_unlock(&panel->panel_lock);
@@ -5453,6 +5464,8 @@ int dsi_panel_disable(struct dsi_panel *panel)
 
 #ifdef CONFIG_D8G_SERVICE
 	oplus_panel_status = 0; // DISPLAY_POWER_OFF
+	oprofile_last = oprofile; // Get latest profile
+	oprofile = 4; // set oprofile to battery when display off
 #endif
 
 	mutex_unlock(&panel->panel_lock);
