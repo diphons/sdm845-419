@@ -560,6 +560,9 @@ static void wcd_mbhc_clr_and_turnon_hph_padac(struct wcd_mbhc *mbhc)
 			       &mbhc->hph_pa_dac_state)) {
 		pr_debug("%s: HPHR clear flag and enable PA\n", __func__);
 		WCD_MBHC_REG_UPDATE_BITS(WCD_MBHC_HPHR_PA_EN, 1);
+#ifdef CONFIG_ARCH_SDM845
+		WCD_MBHC_REG_UPDATE_BITS(WCD_MBHC_HPHR_OCP_DET_EN, 1);
+#endif
 		pa_turned_on = true;
 	}
 	mutex_unlock(&mbhc->hphr_pa_lock);
@@ -568,6 +571,9 @@ static void wcd_mbhc_clr_and_turnon_hph_padac(struct wcd_mbhc *mbhc)
 			       &mbhc->hph_pa_dac_state)) {
 		pr_debug("%s: HPHL clear flag and enable PA\n", __func__);
 		WCD_MBHC_REG_UPDATE_BITS(WCD_MBHC_HPHL_PA_EN, 1);
+#ifdef CONFIG_ARCH_SDM845
+		WCD_MBHC_REG_UPDATE_BITS(WCD_MBHC_HPHL_OCP_DET_EN, 1);
+#endif
 		pa_turned_on = true;
 	}
 	mutex_unlock(&mbhc->hphl_pa_lock);
@@ -780,13 +786,21 @@ void wcd_mbhc_report_plug(struct wcd_mbhc *mbhc, int insertion,
 			}
 			mbhc->hph_type = WCD_MBHC_HPH_NONE;
 			mbhc->zl = mbhc->zr = 0;
+#ifndef CONFIG_ARCH_SDM845
 			if (!mbhc->force_linein) {
+#endif
 				pr_debug("%s: Reporting removal (%x)\n",
 					 __func__, mbhc->hph_status);
 				wcd_mbhc_jack_report(mbhc, &mbhc->headset_jack,
 					0, WCD_MBHC_JACK_MASK);
+#ifndef CONFIG_ARCH_SDM845
 			}
+#endif
+#ifdef CONFIG_ARCH_SDM845
+			if (mbhc->hph_status == SND_JACK_LINEOUT) {
+#else
 			if (mbhc->hph_status == SND_JACK_HEADPHONE) {
+#endif
 
 				pr_debug("%s: Enable micbias\n", __func__);
 				/* Disable current source and enable micbias */
@@ -802,6 +816,9 @@ void wcd_mbhc_report_plug(struct wcd_mbhc *mbhc, int insertion,
 						SND_JACK_LINEOUT |
 						SND_JACK_ANC_HEADPHONE |
 						SND_JACK_UNSUPPORTED);
+#ifdef CONFIG_ARCH_SDM845
+			mbhc->force_linein = false;
+#endif
 		}
 
 		if (mbhc->current_plug == MBHC_PLUG_TYPE_HEADSET &&
@@ -860,6 +877,7 @@ void wcd_mbhc_report_plug(struct wcd_mbhc *mbhc, int insertion,
 #endif
 		}
 
+#ifndef CONFIG_ARCH_SDM845
 		/* Do not calculate impedance again for lineout
 		 * as during playback pa is on and impedance values
 		 * will not be correct resulting in lineout detected
@@ -878,12 +896,15 @@ void wcd_mbhc_report_plug(struct wcd_mbhc *mbhc, int insertion,
 						WCD_MBHC_JACK_MASK);
 			}
 		}
+#endif
 
 		mbhc->hph_status |= jack_type;
 
+#ifndef CONFIG_ARCH_SDM845
 		if (jack_type == SND_JACK_HEADPHONE &&
 		    mbhc->mbhc_cb->mbhc_micb_ramp_control)
 			mbhc->mbhc_cb->mbhc_micb_ramp_control(component, false);
+#endif
 
 		pr_debug("%s: Reporting insertion %d(%x)\n", __func__,
 			 jack_type, mbhc->hph_status);
@@ -909,7 +930,11 @@ void wcd_mbhc_elec_hs_report_unplug(struct wcd_mbhc *mbhc)
 		pr_info("%s: hs_detect_plug work not cancelled\n", __func__);
 
 	pr_debug("%s: Report extension cable\n", __func__);
+#ifdef CONFIG_ARCH_SDM845
+	wcd_mbhc_report_plug(mbhc, 1, SND_JACK_LINEOUT);
+#else
 	wcd_mbhc_report_plug(mbhc, 1, SND_JACK_HEADPHONE);
+#endif
 	/*
 	 * If PA is enabled HPHL schmitt trigger can
 	 * be unreliable, make sure to disable it
@@ -990,8 +1015,13 @@ void wcd_mbhc_find_plug_and_report(struct wcd_mbhc *mbhc,
 		wcd_mbhc_report_plug(mbhc, 1, jack_type);
 	} else if (plug_type == MBHC_PLUG_TYPE_HIGH_HPH) {
 		if (mbhc->mbhc_cfg->detect_extn_cable) {
+#ifdef CONFIG_ARCH_SDM845
+			/* High impedance device found. Report as LINEOUT */
+			wcd_mbhc_report_plug(mbhc, 1, SND_JACK_LINEOUT);
+#else
 			/* High impedance device found. Report as HEADPHONE */
 			wcd_mbhc_report_plug(mbhc, 1, SND_JACK_HEADPHONE);
+#endif
 			pr_debug("%s: setup mic trigger for further detection\n",
 				 __func__);
 
@@ -1014,7 +1044,11 @@ void wcd_mbhc_find_plug_and_report(struct wcd_mbhc *mbhc,
 			wcd_mbhc_hs_elec_irq(mbhc, WCD_MBHC_ELEC_HS_INS,
 					     true);
 		} else {
+#ifdef CONFIG_ARCH_SDM845
+			wcd_mbhc_report_plug(mbhc, 1, SND_JACK_LINEOUT);
+#else
 			wcd_mbhc_report_plug(mbhc, 1, SND_JACK_HEADPHONE);
+#endif
 		}
 	} else {
 		WARN(1, "Unexpected current plug_type %d, plug_type %d\n",
@@ -1061,6 +1095,10 @@ static void wcd_mbhc_swch_irq_handler(struct wcd_mbhc *mbhc)
 	bool detection_type = 0;
 	bool micbias1 = false;
 	struct snd_soc_component *component = mbhc->component;
+#ifdef CONFIG_ARCH_SDM845
+	struct usbc_ana_audio_config *config =
+		&mbhc->mbhc_cfg->usbc_analog_cfg;
+#endif
 	enum snd_jack_types jack_type;
 
 	dev_dbg(component->dev, "%s: enter\n", __func__);
@@ -1220,6 +1258,13 @@ static void wcd_mbhc_swch_irq_handler(struct wcd_mbhc *mbhc)
 		WCD_MBHC_REG_UPDATE_BITS(WCD_MBHC_FSM_EN, 0);
 		WCD_MBHC_REG_UPDATE_BITS(WCD_MBHC_BTN_ISRC_CTL, 0);
 		mbhc->extn_cable_hph_rem = false;
+
+#ifdef CONFIG_ARCH_SDM845
+		if (config->usbc_en1_gpio_p) {
+			msm_cdc_pinctrl_select_sleep_state(config->usbc_en1_gpio_p);
+			pr_info("wcd_mbhc_swch_irq_handler: switch L/R to usb \n");
+		}
+#endif
 	}
 
 done:
@@ -1915,6 +1960,13 @@ static int wcd_mbhc_usb_c_analog_setup_gpios(struct wcd_mbhc *mbhc,
 #ifdef CONFIG_ARCH_SDM845
 		WCD_MBHC_REG_UPDATE_BITS(WCD_MBHC_MIC_CLAMP_CTL, 2);
 		mbhc->mbhc_cfg->enable_dual_adc_gpio(mbhc->mbhc_cfg->dual_adc_gpio_node, 0);
+
+		/*using hardware auto switch gnd and mic if support*/
+		if (mbhc->mbhc_cfg->euro_us_hw_switch_gpio_p) {
+			msm_cdc_pinctrl_select_active_state(mbhc->mbhc_cfg->euro_us_hw_switch_gpio_p);
+			msleep(200);
+			pr_info("hardware auto switch enable\n");
+		}
 #endif
 
 		if (config->usbc_en1_gpio_p)
@@ -1934,6 +1986,11 @@ static int wcd_mbhc_usb_c_analog_setup_gpios(struct wcd_mbhc *mbhc,
 				config->usbc_force_gpio_p);
 
 #ifdef CONFIG_ARCH_SDM845
+		if (mbhc->mbhc_cfg->euro_us_hw_switch_gpio_p) {
+			msm_cdc_pinctrl_select_sleep_state(mbhc->mbhc_cfg->euro_us_hw_switch_gpio_p);
+			pr_info("hardware auto switch disable\n");
+		}
+
 		mbhc->mbhc_cfg->enable_dual_adc_gpio(mbhc->mbhc_cfg->dual_adc_gpio_node, 1);
 #endif
 		if (mbhc->usbc_force_pr_mode) {
@@ -1947,6 +2004,9 @@ static int wcd_mbhc_usb_c_analog_setup_gpios(struct wcd_mbhc *mbhc,
 		}
 
 		mbhc->usbc_mode = POWER_SUPPLY_TYPEC_NONE;
+#ifdef CONFIG_ARCH_SDM845
+		WCD_MBHC_REG_UPDATE_BITS(WCD_MBHC_MIC_CLAMP_CTL, 0);
+#endif
 		if (mbhc->mbhc_cfg->swap_gnd_mic)
 			mbhc->mbhc_cfg->swap_gnd_mic(component, false);
 	}
@@ -2152,6 +2212,30 @@ int wcd_mbhc_start(struct wcd_mbhc *mbhc, struct wcd_mbhc_config *mbhc_cfg)
 			if (rc)
 				goto err;
 		}
+
+#ifdef CONFIG_ARCH_SDM845
+		if (of_find_property(card->dev->of_node,
+					"qcom,hw-auto-sw-en-gpio",
+					NULL)) {
+			rc = wcd_mbhc_init_gpio(mbhc, mbhc_cfg,
+					"qcom,hw-auto-sw-en-gpio",
+					&mbhc_cfg->euro_us_hw_switch_gpio,
+					&mbhc_cfg->euro_us_hw_switch_gpio_p);
+			if (rc)
+				goto err;
+		}
+
+		if (of_find_property(card->dev->of_node,
+					"qcom,uart-audio-sw-gpio",
+					NULL)) {
+			rc = wcd_mbhc_init_gpio(mbhc, mbhc_cfg,
+					"qcom,uart-audio-sw-gpio",
+					&mbhc_cfg->uart_audio_switch_gpio,
+					&mbhc_cfg->uart_audio_switch_gpio_p);
+			if (rc)
+				goto err;
+		}
+#endif
 
 		dev_dbg(component->dev, "%s: calling usb_c_analog_init\n",
 			__func__);
@@ -2406,6 +2490,26 @@ int wcd_mbhc_init(struct wcd_mbhc *mbhc, struct snd_soc_component *component,
 			pr_err("%s: Failed to create new jack USB_3_5 Jack\n", __func__);
 			return ret;
 		}
+
+#ifdef CONFIG_ARCH_SDM845
+		ret = snd_jack_set_key(mbhc->button_jack.jack,
+				       SND_JACK_BTN_1,
+				       KEY_VOLUMEUP);
+		if (ret) {
+			pr_err("%s: Failed to set code for btn-1\n",
+				__func__);
+			return ret;
+		}
+
+		ret = snd_jack_set_key(mbhc->button_jack.jack,
+				       SND_JACK_BTN_2,
+				       KEY_VOLUMEDOWN);
+		if (ret) {
+			pr_err("%s: Failed to set code for btn-2\n",
+				__func__);
+			return ret;
+		}
+#endif
 
 		INIT_DELAYED_WORK(&mbhc->mbhc_firmware_dwork,
 				  wcd_mbhc_fw_read);

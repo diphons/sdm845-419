@@ -447,7 +447,9 @@ struct wcd_mbhc_config {
 	bool usbc_analog_legacy;
 	struct usbc_ana_audio_config usbc_analog_cfg;
 	bool moisture_duty_cycle_en;
+	int euro_us_hw_switch_gpio;
 	int uart_audio_switch_gpio;
+	struct device_node *euro_us_hw_switch_gpio_p; /* used by pinctrl API */
 	struct device_node *uart_audio_switch_gpio_p; /* used by pinctrl API */
 	bool flip_switch;
 	void (*enable_dual_adc_gpio)(struct device_node *node, bool en);

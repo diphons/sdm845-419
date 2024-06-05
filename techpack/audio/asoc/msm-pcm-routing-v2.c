@@ -5720,11 +5720,11 @@ static int msm_routing_ec_ref_rx_get(struct snd_kcontrol *kcontrol,
 	mutex_lock(&routing_lock);
 #ifdef CONFIG_ARCH_SDM845
 	if (!strncmp(widget->name, "AUDIO_REF_EC_UL10 MUX", strlen("AUDIO_REF_EC_UL10 MUX")))
-#endif
-		ucontrol->value.integer.value[0] = msm_route_ec_ref_rx;
-#ifdef CONFIG_ARCH_SDM845
+		ucontrol->value.integer.value[0] = voip_ext_ec_common_ref;
 	else
 		ucontrol->value.integer.value[0] = wakeup_ext_ec_ref;
+#else
+	ucontrol->value.integer.value[0] = msm_route_ec_ref_rx;
 #endif
 	mutex_unlock(&routing_lock);
 
@@ -5863,15 +5863,14 @@ static int msm_routing_ext_ec_get(struct snd_kcontrol *kcontrol,
 	pr_debug("%s: ext_ec_ref_rx  = %x\n", __func__, msm_route_ext_ec_ref);
 #endif
 
-	pr_info("%s: ext_ec_ref_rx  = %x\n", __func__, msm_route_ext_ec_ref);
 	mutex_lock(&routing_lock);
 #ifdef CONFIG_ARCH_SDM845
 	if (!strncmp(widget->name, "VOC_EXT_EC MUX", strlen("VOC_EXT_EC MUX")))
-#endif
-		ucontrol->value.integer.value[0] = msm_route_ext_ec_ref;
-#ifdef CONFIG_ARCH_SDM845
+		ucontrol->value.integer.value[0] = voice_ext_ec_ref;
 	else
 		ucontrol->value.integer.value[0] = voip_ext_ec_ref;
+#else
+	ucontrol->value.integer.value[0] = msm_route_ext_ec_ref;
 #endif
 	mutex_unlock(&routing_lock);
 	return 0;
@@ -29904,6 +29903,8 @@ static const struct snd_soc_dapm_route intercon_tdm[] = {
 	{"AUDIO_REF_EC_UL1 MUX", "TERT_TDM_RX_0", "TERT_TDM_RX_0"},
 	{"AUDIO_REF_EC_UL1 MUX", "SEC_TDM_TX_0", "SEC_TDM_TX_0"},
 	{"AUDIO_REF_EC_UL1 MUX", "QUIN_TDM_TX_0", "QUIN_TDM_TX_0"},
+	{"AUDIO_REF_EC_UL1 MUX", "PRI_TDM_RX_0", "PRI_TDM_RX_0"},
+	{"AUDIO_REF_EC_UL1 MUX", "PRI_TDM_TX_0", "PRI_TDM_TX_0"},
 
 	{"AUDIO_REF_EC_UL10 MUX", "QUAT_TDM_TX_1", "QUAT_TDM_TX_1"},
 	{"AUDIO_REF_EC_UL10 MUX", "QUAT_TDM_RX_0", "QUAT_TDM_RX_0"},
@@ -29914,6 +29915,8 @@ static const struct snd_soc_dapm_route intercon_tdm[] = {
 	{"AUDIO_REF_EC_UL10 MUX", "TERT_TDM_RX_0", "TERT_TDM_RX_0"},
 	{"AUDIO_REF_EC_UL10 MUX", "TERT_TDM_RX_0", "TERT_TDM_RX_0"},
 	{"AUDIO_REF_EC_UL10 MUX", "SEC_TDM_TX_0", "SEC_TDM_TX_0"},
+	{"AUDIO_REF_EC_UL10 MUX", "PRI_TDM_RX_0", "PRI_TDM_RX_0"},
+	{"AUDIO_REF_EC_UL10 MUX", "PRI_TDM_TX_0", "PRI_TDM_TX_0"},
 
 	{"LSM1 Mixer", "QUIN_TDM_TX_0", "QUIN_TDM_TX_0"},
 	{"LSM1 Mixer", "TERT_TDM_TX_0", "TERT_TDM_TX_0"},

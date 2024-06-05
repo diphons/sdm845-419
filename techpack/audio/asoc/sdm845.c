@@ -3881,6 +3881,7 @@ static bool msm_usbc_swap_gnd_mic(struct snd_soc_component *component, bool acti
 	struct msm_asoc_mach_data *pdata = snd_soc_card_get_drvdata(card);
 	struct pinctrl_state *en2_pinctrl_active;
 	struct pinctrl_state *en2_pinctrl_sleep;
+	struct wcd_mbhc_config *mbhc_cfg;
 	int oldv;
 
 	if (!pdata->usbc_en2_gpio_p) {
@@ -3933,7 +3934,14 @@ static bool msm_usbc_swap_gnd_mic(struct snd_soc_component *component, bool acti
 	if (active) {
 		dev_dbg(component->dev, "%s: enter\n", __func__);
 		oldv = tavil_mb_pull_down(component, true, 0);
-		if (pdata->usbc_en2_gpio_p) {
+		if (mbhc_cfg->euro_us_hw_switch_gpio_p) {
+			value = gpio_get_value_cansleep(pdata->usbc_en2_gpio);
+			if (value)
+				msm_cdc_pinctrl_select_sleep_state(mbhc_cfg->euro_us_hw_switch_gpio_p);
+			else
+				msm_cdc_pinctrl_select_active_state(mbhc_cfg->euro_us_hw_switch_gpio_p);
+		}
+		else if (pdata->usbc_en2_gpio_p) {
 			value = gpio_get_value_cansleep(pdata->usbc_en2_gpio);
 			if (value)
 				pinctrl_select_state(pdata->usbc_en2_gpio_p,
