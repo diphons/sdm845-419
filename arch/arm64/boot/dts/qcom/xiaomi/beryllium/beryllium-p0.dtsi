@@ -449,7 +449,7 @@
 		novatek,reset-gpio = <&tlmm 32 0x00>;
 		novatek,irq-gpio = <&tlmm 31 0x2001>;
 		pinctrl-names = "pmx_ts_active", "pmx_ts_suspend";
-		pinctrl-0 = <&ts_int_active_cust &ts_reset_active_cust>;
+		pinctrl-0 = <&ts_int_active &ts_reset_active>;
 		pinctrl-1 = <&ts_int_suspend &ts_reset_suspend>;
 		novatek,config-array-size = <2>;
 		panel = <&dsi_tianma_fhd_nt36672a_video_display>;
@@ -487,7 +487,7 @@
 		focaltech,timeout-read-reg = <1000>;
 		focaltech,cutoff-power;
 		pinctrl-names = "pmx_ts_active", "pmx_ts_suspend";
-		pinctrl-0 = <&ts_int_active_cust &ts_reset_active_cust>;
+		pinctrl-0 = <&ts_int_active &ts_reset_active>;
 		pinctrl-1 = <&ts_int_suspend &ts_reset_suspend>;
 		panel = <&dsi_ebbg_fhd_ft8719_video_display>;
 		/* focaltech,have-key; */
@@ -502,7 +502,7 @@
 
 		iovcc-supply = <&pm8998_l14>;
 
-		pinctrl-0 = <&ts_int_active_cust &ts_reset_active_cust>;
+		pinctrl-0 = <&ts_int_active &ts_reset_active>;
 		pinctrl-1 = <&ts_int_suspend &ts_reset_suspend>;
 		pinctrl-names = "default", "sleep";
 

@@ -81,7 +81,7 @@
 
 	ts_mux {
 
-		ts_int_active_cust: ts_int_active {
+		ts_int_active: ts_int_active {
 			mux {
 				pins = "gpio31";
 				function = "gpio";
@@ -95,7 +95,7 @@
 			};
 		};
 
-		ts_reset_active_cust: ts_reset_active {
+		ts_reset_active: ts_reset_active {
 			mux {
 				pins = "gpio32";
 				function = "gpio";
