@@ -19,6 +19,19 @@
 #include "beryllium-p0-camera-sensor-mtp.dtsi"
 #include "../xiaomi-common.dtsi"
 
+/ {
+	/*
+	 * I don't know where the heck this regulator comes from
+	 * but it powers the touchscreen vdd rail (vsn/vsp??)
+	 */
+	ts_vdd: ts-vdd-regulator {
+		compatible = "regulator-fixed";
+		regulator-name = "ts_vdd";
+		regulator-min-microvolt = <3000000>;
+		regulator-max-microvolt = <3000000>;
+	};
+};
+
 &qupv3_se10_i2c {
 #include "../../smb1355.dtsi"
 };
@@ -467,8 +480,8 @@
 		/* MP */
 		/*novatek,mp-support-dt;*/
 	};
-#ifdef CONFIG_TOUCHSCREEN_FTS_MI845
 	focaltech@38 {
+#ifdef CONFIG_TOUCHSCREEN_FTS_MI845
 		compatible = "focaltech,focal";
 		reg = <0x38>;
 		interrupt-parent = <&tlmm>;
@@ -491,9 +504,23 @@
 		pinctrl-1 = <&ts_int_suspend &ts_reset_suspend>;
 		panel = <&dsi_ebbg_fhd_ft8719_video_display>;
 		/* focaltech,have-key; */
-	};
 #else
-	focaltech@38 {
+#ifdef CONFIG_TOUCHSCREEN_FTS_MAINLINE
+		compatible = "focaltech,fts";
+		reg = <0x38>;
+		interrupt-parent = <&tlmm>;
+		interrupts = <31 0>;
+		vdd-supply = <&ts_vdd>;
+
+		focaltech,reset-gpio = <&tlmm 32 0x01>;
+		focaltech,irq-gpio = <&tlmm 31 0x02>;
+		focaltech,max-touch-number = <10>;
+		focaltech,display-size = <1080 2246>;
+		pinctrl-names = "pmx_ts_active", "pmx_ts_suspend";
+		pinctrl-0 = <&ts_int_active &ts_reset_active>;
+		pinctrl-1 = <&ts_int_suspend &ts_reset_suspend>;
+		panel = <&dsi_ebbg_fhd_ft8719_video_display>;
+#else
 		compatible = "focaltech,ft8719";
 		reg = <0x38>;
 
@@ -509,8 +536,9 @@
 		touchscreen-size-x = <1080>;
 		touchscreen-size-y = <2246>;
 		panel = <&dsi_ebbg_fhd_ft8719_video_display>;
-	};
 #endif
+#endif
+	};
 };
 
 &qupv3_se6_4uart {
