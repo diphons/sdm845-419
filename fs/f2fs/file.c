@@ -61,9 +61,6 @@ struct page_list {
 };
 static struct kmem_cache *page_info_slab;
 
-bool may_compress = false;
-bool may_set_compr_fl = false;
-
 #define LOG_PAGE_INTO_LIST(head, page)	do {			\
 	struct page_list *tmp;					\
 	tmp = f2fs_kmem_cache_alloc(page_info_slab, GFP_NOFS);	\

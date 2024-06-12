@@ -4993,8 +4993,8 @@ static inline void f2fs_invalidate_compress_pages(struct f2fs_sb_info *sbi,
 #define inc_compr_inode_stat(inode)		do { } while (0)
 #endif
 
-extern bool may_compress;
-extern bool may_set_compr_fl;
+extern bool may_compress __read_mostly ;
+extern bool may_set_compr_fl __read_mostly ;
 
 static inline int set_compress_context(struct inode *inode)
 {

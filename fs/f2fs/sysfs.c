@@ -21,6 +21,9 @@
 
 struct proc_dir_entry *f2fs_proc_root;
 
+bool may_compress __read_mostly = false;
+bool may_set_compr_fl __read_mostly = false;
+
 /* Sysfs support for f2fs */
 enum {
 	GC_THREAD,	/* struct f2fs_gc_thread */
