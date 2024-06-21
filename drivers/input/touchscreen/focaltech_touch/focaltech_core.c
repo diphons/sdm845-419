@@ -45,6 +45,9 @@
 #endif
 #include <linux/backlight.h>
 #include <linux/input/touch_common_info.h>
+#ifdef CONFIG_D8G_SERVICE
+#include <misc/d8g_helper.h>
+#endif
 
 
 /*****************************************************************************
@@ -1957,6 +1960,17 @@ static int fb_notifier_callback(struct notifier_block *self, unsigned long event
 		if (*blank == MI_DRM_BLANK_UNBLANK) {
 			FTS_INFO("FTS do resume work\n");
 			queue_work(fts_data->event_wq, &fts_data->resume_work);
+#ifdef CONFIG_D8G_SERVICE
+			if (touch_boost) {
+				if (touch_boost_mode) {
+					sched_set_mode(fts_data->irq, cpu_perf_mask, true, 2);
+				} else {
+					sched_set_mode(fts_data->irq, cpu_perf_mask, false, 2);
+				}
+			} else {
+				sched_set_mode(fts_data->irq, cpumask_of(0), false, 0);
+			}
+#endif
 		} else if (*blank == MI_DRM_BLANK_POWERDOWN || *blank == MI_DRM_BLANK_LP1 || *blank == MI_DRM_BLANK_LP2) {
 			FTS_INFO("FTS do suspend work by event %s\n", *blank == MI_DRM_BLANK_POWERDOWN ? "POWER DOWN" : "LP");
 			if (*blank == MI_DRM_BLANK_POWERDOWN && fts_data->finger_in_fod) {
@@ -1967,6 +1981,9 @@ static int fb_notifier_callback(struct notifier_block *self, unsigned long event
 				}
 			}
 			queue_work(fts_data->event_wq, &fts_data->suspend_work);
+#ifdef CONFIG_D8G_SERVICE
+			sched_set_mode(fts_data->irq, cpumask_of(0), false, 0);
+#endif
 		}
 	}
 

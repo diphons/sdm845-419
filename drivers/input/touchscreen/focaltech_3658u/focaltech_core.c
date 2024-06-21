@@ -43,6 +43,9 @@
 #include <linux/earlysuspend.h>
 #define FTS_SUSPEND_LEVEL 1     /* Early-suspend level */
 #endif
+#ifdef CONFIG_D8G_SERVICE
+#include <misc/d8g_helper.h>
+#endif
 #include "focaltech_core.h"
 
 /*****************************************************************************
@@ -1361,12 +1364,25 @@ static int drm_notifier_callback(struct notifier_block *self,
 
 	if (blank == MI_DRM_BLANK_UNBLANK) {
 		queue_work(fts_data->ts_workqueue, &fts_data->resume_work);
-
+#ifdef CONFIG_D8G_SERVICE
+		if (touch_boost) {
+			if (touch_boost_mode) {
+				sched_set_mode(fts_data->irq, cpu_perf_mask, true, 2);
+			} else {
+				sched_set_mode(fts_data->irq, cpu_perf_mask, false, 2);
+			}
+		} else {
+			sched_set_mode(fts_data->irq, cpumask_of(0), false, 0);
+		}
+#endif
 	} else if (blank == MI_DRM_BLANK_POWERDOWN ||
 			blank == MI_DRM_BLANK_LP1 ||
 			blank == MI_DRM_BLANK_LP2) {
 		cancel_work_sync(&fts_data->resume_work);
 		fts_ts_suspend(ts_data->dev);
+#ifdef CONFIG_D8G_SERVICE
+		sched_set_mode(fts_data->irq, cpumask_of(0), false, 0);
+#endif
 	}
 
 exit:

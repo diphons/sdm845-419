@@ -90,6 +90,9 @@
 #include <linux/input/tp_common.h>
 #endif
 #endif
+#ifdef CONFIG_D8G_SERVICE
+#include <misc/d8g_helper.h>
+#endif
 
 /**
  * Event handler installer helpers
@@ -6249,12 +6252,26 @@ static int fts_drm_state_chg_callback(struct notifier_block *nb,
 
 			flush_workqueue(info->event_wq);
 			queue_work(info->event_wq, &info->suspend_work);
+#ifdef CONFIG_D8G_SERVICE
+			sched_set_mode(info->client->irq, cpumask_of(0), false, 0);
+#endif
 		} else if (val == MI_DRM_EVENT_BLANK && blank == MI_DRM_BLANK_UNBLANK) {
 			if (!info->sensor_sleep)
 				return NOTIFY_OK;
 			MI_TOUCH_LOGI(1, "%s %s: FB_BLANK_UNBLANK\n", tag, __func__);
 			flush_workqueue(info->event_wq);
 			queue_work(info->event_wq, &info->resume_work);
+#ifdef CONFIG_D8G_SERVICE
+			if (touch_boost) {
+				if (touch_boost_mode) {
+					sched_set_mode(info->client->irq, cpu_perf_mask, true, 2);
+				} else {
+					sched_set_mode(info->client->irq, cpu_perf_mask, false, 2);
+				}
+			} else {
+				sched_set_mode(info->client->irq, cpumask_of(0), false, 0);
+			}
+#endif
 		}
 	}
 	return NOTIFY_OK;

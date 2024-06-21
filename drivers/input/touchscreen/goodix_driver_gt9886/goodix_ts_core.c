@@ -31,6 +31,9 @@
 #include <linux/fb.h>
 #endif
 #include <linux/pm_wakeup.h>
+#ifdef CONFIG_D8G_SERVICE
+#include <misc/d8g_helper.h>
+#endif
 #include "goodix_ts_core.h"
 
 #ifdef CONFIG_TOUCHSCREEN_COMMON
@@ -2192,10 +2195,24 @@ int goodix_ts_fb_notifier_callback(struct notifier_block *self,
 		if (event == MI_DRM_EVENT_BLANK && blank == MI_DRM_BLANK_UNBLANK) {
 			ts_info("touchpanel resume");
 			queue_work(core_data->event_wq, &core_data->resume_work);
+#ifdef CONFIG_D8G_SERVICE
+			if (touch_boost) {
+				if (touch_boost_mode) {
+					sched_set_mode(core_data->irq, cpu_perf_mask, true, 2);
+				} else {
+					sched_set_mode(core_data->irq, cpu_perf_mask, false, 2);
+				}
+			} else {
+				sched_set_mode(core_data->irq, cpumask_of(0), false, 0);
+			}
+#endif
 		} else if (event == MI_DRM_EVENT_BLANK && (blank == MI_DRM_BLANK_POWERDOWN ||
 			blank == MI_DRM_BLANK_LP1 || blank == MI_DRM_BLANK_LP2)) {
 			ts_info("touchpanel suspend by %s", blank == MI_DRM_BLANK_POWERDOWN ? "blank" : "doze");
 			queue_work(core_data->event_wq, &core_data->suspend_work);
+#ifdef CONFIG_D8G_SERVICE
+			sched_set_mode(core_data->irq, cpumask_of(0), false, 0);
+#endif
 		}
 	}
 

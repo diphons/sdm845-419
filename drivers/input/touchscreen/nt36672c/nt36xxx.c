@@ -50,6 +50,9 @@
 #include <linux/input/tp_common.h>
 #endif
 #endif
+#ifdef CONFIG_D8G_SERVICE
+#include <misc/d8g_helper.h>
+#endif
 
 #if NVT_TOUCH_ESD_PROTECT
 static struct delayed_work nvt_esd_check_work;
@@ -3242,12 +3245,26 @@ static int nvt_drm_notifier_callback(struct notifier_block *self, unsigned long 
 				NVT_LOG("event=%lu, *blank=%d\n", event, *blank);
 				flush_workqueue(ts_data->event_wq);
 				nvt_ts_suspend(&ts_data->client->dev);
+#ifdef CONFIG_D8G_SERVICE
+				sched_set_mode(ts->client->irq, cpumask_of(0), false, 0);
+#endif
 			}
 		} else if (event == MI_DRM_EVENT_BLANK) {
 			if (*blank == MI_DRM_BLANK_UNBLANK) {
 				NVT_LOG("event=%lu, *blank=%d\n", event, *blank);
 				flush_workqueue(ts_data->event_wq);
 				queue_work(ts_data->event_wq, &ts_data->resume_work);
+#ifdef CONFIG_D8G_SERVICE
+				if (touch_boost) {
+					if (touch_boost_mode) {
+						sched_set_mode(ts->client->irq, cpu_perf_mask, true, 2);
+					} else {
+						sched_set_mode(ts->client->irq, cpu_perf_mask, false, 2);
+					}
+				} else {
+					sched_set_mode(ts->client->irq, cpumask_of(0), false, 0);
+				}
+#endif
 			}
 		}
 	}
@@ -3267,6 +3284,9 @@ static int nvt_fb_notifier_callback(struct notifier_block *self, unsigned long e
 			NVT_LOG("event=%lu, *blank=%d\n", event, *blank);
 			flush_workqueue(ts->event_wq);
 			nvt_ts_suspend(&ts->client->dev);
+#ifdef CONFIG_D8G_SERVICE
+			sched_set_mode(ts->client->irq, cpumask_of(0), false, 0);
+#endif
 		}
 	} else if (evdata && evdata->data && event == FB_EVENT_BLANK) {
 		blank = evdata->data;
@@ -3274,6 +3294,17 @@ static int nvt_fb_notifier_callback(struct notifier_block *self, unsigned long e
 			NVT_LOG("event=%lu, *blank=%d\n", event, *blank);
 			flush_workqueue(ts->event_wq);
 			queue_work(ts->event_wq, &ts->resume_work);
+#ifdef CONFIG_D8G_SERVICE
+			if (touch_boost) {
+				if (touch_boost_mode) {
+					sched_set_mode(ts->client->irq, cpu_perf_mask, true, 2);
+				} else {
+					sched_set_mode(ts->client->irq, cpu_perf_mask, false, 2);
+				}
+			} else {
+				sched_set_mode(ts->client->irq, cpumask_of(0), false, 0);
+			}
+#endif
 		}
 	}
 
