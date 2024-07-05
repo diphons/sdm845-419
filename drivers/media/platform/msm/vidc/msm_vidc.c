@@ -25,6 +25,9 @@
 #include "vidc_hfi_api.h"
 #include "msm_vidc_clocks.h"
 #include <linux/dma-buf.h>
+#ifdef CONFIG_D8G_SERVICE
+#include <misc/d8g_helper.h>
+#endif
 
 #define MAX_EVENTS 30
 
@@ -1907,6 +1910,10 @@ void *msm_vidc_open(int core_id, int session_type)
 		goto err_invalid_core;
 	}
 
+#ifdef CONFIG_D8G_SERVICE
+	game_ai_video_mode = true;
+#endif
+
 	pr_info(VIDC_DBG_TAG "Opening video instance: %pK, %d\n",
 		"info", inst, session_type);
 	mutex_init(&inst->sync_lock);
@@ -2192,6 +2199,10 @@ int msm_vidc_destroy(struct msm_vidc_inst *inst)
 	mutex_destroy(&inst->lock);
 #ifdef CONFIG_DEBUG_FS
 	msm_vidc_debugfs_deinit_inst(inst);
+#endif
+
+#ifdef CONFIG_D8G_SERVICE
+	game_ai_video_mode = false;
 #endif
 
 	pr_info(VIDC_DBG_TAG "Closed video instance: %pK\n",

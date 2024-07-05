@@ -4695,8 +4695,6 @@ int dsi_panel_set_lp1(struct dsi_panel *panel)
 		DSI_ERR("[%s] failed to send DSI_CMD_SET_LP1 cmd, rc=%d\n",
 		       panel->name, rc);
 
-
-
 exit:
 	//for l3a && j11
 	if (panel->mi_cfg.panel_id == 0x4C334100420200 || panel->mi_cfg.panel_id == 0x4A323200380801)
@@ -4811,6 +4809,7 @@ exit_skip:
 	if (oprofile_last < 0) 
 		oprofile_last = oprofile;
 	oprofile = oprofile_last; // set oprofile to last profile setted
+	set_amoled_display();
 #endif
 
 exit:
@@ -5249,6 +5248,7 @@ int dsi_panel_enable(struct dsi_panel *panel)
 	if (oprofile_last < 0) 
 		oprofile_last = oprofile;
 	oprofile = oprofile_last; // set oprofile to last profile setted
+	set_amoled_display();
 #endif
 
 	mutex_unlock(&panel->panel_lock);

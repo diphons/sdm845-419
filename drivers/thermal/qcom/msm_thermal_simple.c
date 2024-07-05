@@ -15,8 +15,6 @@
 #include <linux/moduleparam.h>
 #include <misc/d8g_helper.h>
 
-int dc_set __read_mostly;
-
 #define OF_READ_U32(node, prop, dst)						\
 ({										\
 	int ret = of_property_read_u32(node, prop, &(dst));			\
@@ -134,28 +132,75 @@ static void thermal_throttle_worker(struct work_struct *work)
 		else if (temp_gpu >= 70000)
 			temp_avg = (temp_total + temp_gpu) / NR_CPUS;
 	}
-	
+
 	/* Dynamic charging coming up */
 	if (dynamic_charger) {
-		if (temp_batt <= 30000) {
-			dc_set = 0;
-		} else if (temp_batt > 30000 && temp_batt <= 34000) {
-			dc_set = 2;
-		} else if (temp_batt > 34000 && temp_batt <= 38000) {
-			dc_set = 3;
+		if (temp_batt <= 38000) {
+#ifdef CONFIG_ARCH_KONA
+#if defined(CONFIG_BOARD_MUNCH) || defined(CONFIG_MACH_XIAOMI_MUNCH)
+			dynamic_chg_max = CHG_10;
+#else
+			dynamic_chg_max = CHG_8;
+#endif
+#else
+			dynamic_chg_max = CHG_4;
+#endif
 		} else if (temp_batt > 38000 && temp_batt <= 40000) {
-			dc_set = 4;
-		} else if (temp_batt > 40000 && temp_batt <= 45000) {
-			dc_set = 5;
-		} else if (temp_batt > 45000) {
-			dc_set = 6;
+#ifdef CONFIG_ARCH_KONA
+#if defined(CONFIG_BOARD_MUNCH) || defined(CONFIG_MACH_XIAOMI_MUNCH)
+			dynamic_chg_max = CHG_9;
+#else
+			dynamic_chg_max = CHG_6;
+#endif
+#else
+			dynamic_chg_max = CHG_3;
+#endif
+		} else if (temp_batt > 40000 && temp_batt <= 42000) {
+#ifdef CONFIG_ARCH_KONA
+#if defined(CONFIG_BOARD_MUNCH) || defined(CONFIG_MACH_XIAOMI_MUNCH)
+			dynamic_chg_max = CHG_8;
+#else
+			dynamic_chg_max = CHG_5;
+#endif
+#else
+			dynamic_chg_max = CHG_2;
+#endif
+		} else if (temp_batt > 42000 && temp_batt <= 45000) {
+#ifdef CONFIG_ARCH_KONA
+#if defined(CONFIG_BOARD_MUNCH) || defined(CONFIG_MACH_XIAOMI_MUNCH)
+			dynamic_chg_max = CHG_5;
+#else
+			dynamic_chg_max = CHG_4;
+#endif
+#else
+			dynamic_chg_max = CHG_1;
+#endif
+		} else if (temp_batt > 45000 && temp_batt <= 50000) {
+#ifdef CONFIG_ARCH_KONA
+#if defined(CONFIG_BOARD_MUNCH) || defined(CONFIG_MACH_XIAOMI_MUNCH)
+			dynamic_chg_max = CHG_2;
+#else
+			dynamic_chg_max = CHG_1;
+#endif
+#else
+			dynamic_chg_max = CHG_0;
+#endif
+		} else if (temp_batt > 50000) {
+#ifdef CONFIG_ARCH_KONA
+#if defined(CONFIG_BOARD_MUNCH) || defined(CONFIG_MACH_XIAOMI_MUNCH)
+			dynamic_chg_max = CHG_1;
+#else
+			dynamic_chg_max = CHG_0;
+#endif
+#else
+			dynamic_chg_max = CHG_0;
+#endif
 		}
 	} else {
-		dc_set = 0;
+		dynamic_chg_max = -1;
 	}
 
 	temp_avg_show = temp_avg;
-	dc_show = dc_set;
 	old_zone = t->curr_zone;
 	new_zone = NULL;
 
@@ -211,6 +256,33 @@ static int cpu_notifier_cb(struct notifier_block *nb, unsigned long val,
 	struct thermal_drv *t = container_of(nb, typeof(*t), cpu_notif);
 	struct cpufreq_policy *policy = data;
 	struct thermal_zone *zone;
+
+	if (gamer && game_ai_enable) {
+		if (cpumask_test_cpu(policy->cpu, cpu_perf_mask)) {
+			if (ongame)
+#ifdef CONFIG_ARCH_SDM845
+				policy->max = FREQ_MAX_GAME_AI;
+#else
+				policy->max = policy->user_policy.max;
+#endif
+			else if (game_ai_video_mode && game_ai_vcall)
+				policy->max = FREQ_LIMIT_PERF;
+#ifdef CONFIG_ARCH_SDM845
+			else if (policy->max > FREQ_LIMIT_GAME_AI)
+				policy->max = FREQ_LIMIT_GAME_AI;
+#endif
+#ifdef CONFIG_ARCH_KONA
+		} else if (cpumask_test_cpu(policy->cpu, cpu_prime_mask)) {
+			if (ongame)
+				policy->max = FREQ_MAX_GAME_AI;
+			else if (game_ai_video_mode && game_ai_vcall)
+				policy->max = FREQ_LIMIT_PRIME;
+			else if (policy->max > FREQ_LIMIT_GAME_AI)
+				policy->max = FREQ_LIMIT_GAME_AI;
+		}
+#endif
+		return NOTIFY_OK;
+	}
 
 	if (val != CPUFREQ_ADJUST)
 		return NOTIFY_OK;

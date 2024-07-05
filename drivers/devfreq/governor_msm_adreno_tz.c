@@ -97,6 +97,10 @@ static ssize_t adrenoboost_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {
 	size_t count = 0;
+#ifdef CONFIG_D8G_SERVICE
+	if (game_ai_enable && ongame)
+		return game_ai_adrenoboost;
+#endif
 	count += sprintf(buf, "%d\n", adrenoboost);
 
 	return count;
@@ -106,6 +110,12 @@ static ssize_t adrenoboost_save(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t count)
 {
 	int input;
+#ifdef CONFIG_D8G_SERVICE
+	if (game_ai_enable && ongame) {
+		adrenoboost = game_ai_adrenoboost;
+		return count;
+	}
+#endif
 	sscanf(buf, "%d ", &input);
 	if (input < 0 || input > 3) {
 		adrenoboost = 0;
@@ -427,7 +437,7 @@ static int tz_get_target_freq(struct devfreq *devfreq, unsigned long *freq)
 	// scale busy time up based on adrenoboost parameter, only if MIN_BUSY exceeded...
 	if ((unsigned int)(priv->bin.busy_time + stats->busy_time) >= MIN_BUSY) {
 #ifdef CONFIG_D8G_SERVICE
-		if (limited)
+		if (limited || (game_ai_enable && !ongame))
 			priv->bin.busy_time += stats->busy_time;
 		else
 #endif
